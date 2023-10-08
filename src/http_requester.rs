@@ -185,7 +185,6 @@ mod tests {
 
         match req.build_client() {
             Ok(client) => {
-                println!("{:?}", client);
                 assert!(format!("{:?}", client).contains("gzip: false"));
                 assert!(format!("{:?}", client).contains("Http(https://secure.example)"));
                 assert!(format!("{:?}", client).contains("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"));
@@ -210,7 +209,6 @@ mod tests {
 
         match http.build_reqwest(req) {
             Ok(b) => {
-                println!("{:?}", b);
                 assert!(format!("{:?}", b).contains("method: POST"));
                 assert!(format!("{:?}", b).contains("google.com"));
                 assert!(format!("{:?}", b).contains("x-api-key"));
@@ -231,7 +229,6 @@ mod tests {
 
         match http.build_reqwest(req) {
             Ok(b) => {
-                println!("{:?}", b);
                 assert!(format!("{:?}", b).contains("method: POST"));
                 assert!(format!("{:?}", b).contains("test.com"));
             }
@@ -246,7 +243,6 @@ mod tests {
 
         match http.build_reqwest(req) {
             Ok(b) => {
-                println!("{:?}", b);
                 assert!(format!("{:?}", b).contains("method: PATCH"));
                 assert!(format!("{:?}", b).contains("aol.com"));
             }
