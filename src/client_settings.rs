@@ -1,5 +1,6 @@
 use reqwest::Proxy;
 
+#[derive(Clone)]
 pub struct ClientSettings {
     proxy: Option<Proxy>,
     user_agent: Option<String>,

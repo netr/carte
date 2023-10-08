@@ -9,6 +9,7 @@ use reqwest_cookie_store::{CookieStore, CookieStoreMutex};
 use crate::client_settings::ClientSettings;
 use crate::request::Request;
 
+#[derive(Clone)]
 pub struct HttpRequester {
     cookie_store: Arc<CookieStoreMutex>,
     pub settings: Box<ClientSettings>,
