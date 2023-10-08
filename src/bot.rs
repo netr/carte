@@ -1,50 +1,13 @@
 use std::collections::HashMap;
-use std::error;
 
 use async_trait::async_trait;
-use reqwest::{Error, RequestBuilder, Response};
+use reqwest::{RequestBuilder, Response};
 
-use crate::{HttpRequester, Request};
-
-pub struct StepManager {
-    handlers: HashMap<String, Box<dyn Stepper>>,
-}
-
-impl StepManager {
-    pub fn new() -> Self {
-        let handlers = HashMap::new();
-        StepManager {
-            handlers
-        }
-    }
-
-    pub fn insert(&mut self, step: impl Stepper + 'static) {
-        self.handlers.insert(step.name().parse().unwrap(), Box::new(step));
-    }
-
-    pub fn get(&mut self, step: &str) -> Option<&mut Box<dyn Stepper>> {
-        let step = self.handlers.get_mut(step).unwrap();
-        Some(step)
-    }
-
-    pub fn len(&mut self) -> usize {
-        self.handlers.len()
-    }
-
-    pub fn contains_name(&mut self, step: &String) -> bool {
-        self.handlers.contains_key(step)
-    }
-
-    pub fn contains_step(&mut self, step: impl Stepper) -> bool {
-        self.handlers.contains_key(step.name())
-    }
-}
-
+use crate::{HttpRequester, Request, StepError};
 
 pub struct Bot {
     pub steps: StepManager,
 }
-
 
 impl Bot {
     pub fn new() -> Self {
@@ -52,73 +15,89 @@ impl Bot {
         Bot { steps }
     }
 
-    pub async fn handle_step(&mut self, step_id: String) -> Result<StepperStore, Box<dyn error::Error>> {
-        let step = match self.steps.get(&step_id) {
+    /// Handles the step by executing the request and calling the step's `on_success` or `on_error` methods.
+    pub async fn handle_step(&mut self, step_name: String) -> Result<Context, StepError> {
+        let step = match self.steps.get(&step_name) {
             Some(step) => step,
-            None => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "step not found"))),
+            None => {
+                return Err(StepError::StepNotFound(step_name.clone()));
+            }
         };
 
         let stop_watch = std::time::Instant::now();
 
         let req = step.on_request();
-        let mut store = Self::new_stepper_store(req);
-        let req_builder = store.request_builder.take().unwrap();
-        let res = req_builder.send().await?;
+        let mut ctx = Self::new_context(req);
+        let req_builder = ctx.request_builder.take().unwrap();
 
-        store.time_elapsed = stop_watch.elapsed().as_millis() as u64;
+        let res = if let Some(res) = req_builder.send().await.ok() {
+            res
+        } else {
+            step.on_error(StepError::Unsuccessful);
+            return Err(StepError::Unsuccessful);
+        };
 
-        if let Some(codes) = store.success_codes.clone() {
+        ctx.time_elapsed = stop_watch.elapsed().as_millis() as u64;
+
+        if let Some(codes) = ctx.status_codes.clone() {
             if !codes.contains(&res.status().as_u16()) {
-                return Err(Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "step failed")));
+                step.on_error(StepError::StatusCodeNotFound(
+                    res.status().as_u16() as i32,
+                    ctx.status_codes.clone().unwrap(),
+                ));
+
+                return Err(StepError::StatusCodeNotFound(
+                    res.status().as_u16() as i32,
+                    ctx.status_codes.clone().unwrap(),
+                ));
             }
         } else {
             if !res.status().is_success() {
-                return Err(Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "step failed")));
+                step.on_error(StepError::Unsuccessful);
+                return Err(StepError::Unsuccessful);
             }
         }
 
-        store.response = Some(res);
-        step.on_success(&mut store);  // Using the reference
+        ctx.response = Some(res);
+        step.on_success(&mut ctx); // Using the reference
 
-        Ok(store)
+        Ok(ctx)
     }
 
-    fn new_stepper_store(req: Request) -> StepperStore {
+    fn new_context(req: Request) -> Context {
         let http_req: HttpRequester = HttpRequester::new();
         let status_codes = req.status_codes.clone();
         let req_builder = http_req.build_reqwest(req).unwrap();
 
-        StepperStore {
+        Context {
             http_requester: http_req,
             request_builder: Some(req_builder),
             response: None,
             next_step: None,
-            success_codes: status_codes,
+            status_codes,
             time_elapsed: 0,
         }
     }
 }
 
-#[async_trait]
-pub trait Stepper {
-    fn name(&self) -> &'static str;
-    fn on_request(&mut self) -> Request;
-    fn on_success(&self, store: &mut StepperStore);
-    fn on_error(&self, err: Error);
-    fn on_timeout(&self);
-    // async fn execute(&self, res: StepperResponse) -> Result<StepperResponse, Error>;
-}
-
-pub struct StepperStore {
+/// The context for the bots current step's execution.
+/// This is passed to the step's `on_success` and `on_error` methods.
+pub struct Context {
+    /// The HTTP requester which manages cookie store and client settings.
     pub http_requester: HttpRequester,
+    /// The request builder from reqwest.
     pub request_builder: Option<RequestBuilder>,
+    /// The response from the request.
     pub response: Option<Response>,
+    /// The next step to be executed.
     pub next_step: Option<String>,
-    pub success_codes: Option<Vec<u16>>,
+    /// If status codes are provided, then the response status code must be in the list.
+    pub status_codes: Option<Vec<u16>>,
+    /// The time elapsed in milliseconds for the request.
     pub time_elapsed: u64,
 }
 
-impl StepperStore {
+impl Context {
     pub fn set_next_step(&mut self, step: String) {
         self.next_step = Some(step);
     }
@@ -136,12 +115,65 @@ impl StepperStore {
     }
 }
 
+#[async_trait]
+pub trait Stepable {
+    fn name(&self) -> String;
+    fn on_request(&mut self) -> Request;
+    fn on_success(&self, ctx: &mut Context);
+    fn on_error(&self, err: StepError);
+    fn on_timeout(&self);
+    // async fn execute(&self, res: StepperResponse) -> Result<StepperResponse, Error>;
+}
+
+pub struct StepManager {
+    handlers: HashMap<String, Box<dyn Stepable>>,
+}
+
+impl StepManager {
+    pub fn new() -> Self {
+        let handlers = HashMap::new();
+        StepManager { handlers }
+    }
+
+    pub fn insert(&mut self, step: impl Stepable + 'static) {
+        self.handlers
+            .insert(step.name().parse().unwrap(), Box::new(step));
+    }
+
+    pub fn insert_box(&mut self, step: Box<dyn Stepable>) {
+        self.handlers.insert(step.name().parse().unwrap(), step);
+    }
+
+    pub fn insert_many(&mut self, steps: Vec<Box<dyn Stepable>>) {
+        for step in steps {
+            self.handlers.insert(step.name().parse().unwrap(), step);
+        }
+    }
+
+    pub fn get(&mut self, step: &str) -> Option<&mut Box<dyn Stepable>> {
+        let step = self.handlers.get_mut(step).unwrap();
+        Some(step)
+    }
+
+    pub fn len(&mut self) -> usize {
+        self.handlers.len()
+    }
+
+    pub fn contains_name(&mut self, step: &String) -> bool {
+        self.handlers.contains_key(step)
+    }
+
+    pub fn contains_step(&mut self, step: impl Stepable) -> bool {
+        self.handlers.contains_key(step.name().as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
-    use reqwest::Method;
     use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+    use reqwest::Method;
 
     use crate::Request;
 
@@ -151,8 +183,10 @@ mod tests {
     struct RobotsTxt;
 
     #[async_trait]
-    impl Stepper for RobotsTxt {
-        fn name(&self) -> &'static str { "RobotsTxt" }
+    impl Stepable for RobotsTxt {
+        fn name(&self) -> &'static str {
+            "RobotsTxt"
+        }
 
         fn on_request(&mut self) -> Request {
             let mut headers = HeaderMap::new();
@@ -168,10 +202,10 @@ mod tests {
             }
         }
 
-        fn on_success(&self, store: &mut StepperStore) {
+        fn on_success(&self, ctx: &mut Context) {
             // sleep for 100 ms
             std::thread::sleep(Duration::from_millis(100));
-            store.set_next_step("RobotsTxt".to_string());
+            ctx.set_next_step("RobotsTxt".to_string());
         }
 
         fn on_error(&self, _err: Error) {
@@ -182,7 +216,6 @@ mod tests {
             todo!()
         }
     }
-
 
     #[test]
     fn it_initializes() {
@@ -202,13 +235,13 @@ mod tests {
     #[tokio::test]
     async fn bot_should_have_next_step_in_store_as_expected() {
         let step = RobotsTxt {};
-        let store = &mut StepperStore {
+        let store = &mut Context {
             http_requester: HttpRequester::new(),
             request_builder: None,
             response: None,
             next_step: None,
             time_elapsed: 0,
-            success_codes: None,
+            status_codes: None,
         };
         let _ = step.on_success(store);
 
