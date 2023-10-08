@@ -24,40 +24,44 @@ impl Bot {
             }
         };
 
+        // Start processing the request and time it.
         let stop_watch = std::time::Instant::now();
 
         let req = step.on_request();
         let mut ctx = Self::new_context(req);
         let req_builder = ctx.request_builder.take().unwrap();
 
-        let res = if let Some(res) = req_builder.send().await.ok() {
-            res
-        } else {
-            step.on_error(StepError::Unsuccessful);
-            return Err(StepError::Unsuccessful);
+        let res = match req_builder.send().await {
+            Ok(res) => res,
+            Err(err) => {
+                step.on_error(StepError::ReqwestError(err.to_string()));
+                return Err(StepError::ReqwestError(err.to_string()));
+            }
         };
 
         ctx.time_elapsed = stop_watch.elapsed().as_millis() as u64;
 
-        if let Some(codes) = ctx.status_codes.clone() {
-            if !codes.contains(&res.status().as_u16()) {
-                step.on_error(StepError::StatusCodeNotFound(
-                    res.status().as_u16() as i32,
-                    ctx.status_codes.clone().unwrap(),
-                ));
+        // Check if the status code is in the list of expected status codes.
+        let status_code = res.status().as_u16();
+        let expected_codes = ctx.status_codes.as_ref();
 
-                return Err(StepError::StatusCodeNotFound(
-                    res.status().as_u16() as i32,
-                    ctx.status_codes.clone().unwrap(),
-                ));
-            }
+        let error_condition = if let Some(codes) = expected_codes {
+            !codes.contains(&status_code)
         } else {
-            if !res.status().is_success() {
-                step.on_error(StepError::Unsuccessful);
-                return Err(StepError::Unsuccessful);
-            }
+            !res.status().is_success()
+        };
+
+        if error_condition {
+            let error = StepError::StatusCodeNotFound(
+                status_code as i32,
+                expected_codes.cloned().unwrap_or_else(Vec::new),
+            );
+
+            step.on_error(error.clone());
+            return Err(error);
         }
 
+        // Everything is good, so call the step's `on_success` method.
         ctx.response = Some(res);
         step.on_success(&mut ctx); // Using the reference
 

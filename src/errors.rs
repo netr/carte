@@ -1,9 +1,9 @@
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StepError {
-    Unsuccessful,
+    ReqwestError(String),
     StepNotFound(String),
     StatusCodeNotFound(i32, Vec<u16>),
 }
@@ -11,8 +11,8 @@ pub enum StepError {
 impl fmt::Display for StepError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            StepError::Unsuccessful => write!(f, "Step was unsuccessful"),
             StepError::StepNotFound(step_name) => write!(f, "Step not found: {}", step_name),
+            StepError::ReqwestError(err) => write!(f, "Reqwest error: {}", err),
             StepError::StatusCodeNotFound(code, expected_codes) => {
                 write!(
                     f,
@@ -25,9 +25,3 @@ impl fmt::Display for StepError {
 }
 
 impl Error for StepError {}
-
-impl From<std::io::Error> for StepError {
-    fn from(_: std::io::Error) -> Self {
-        StepError::Unsuccessful
-    }
-}
