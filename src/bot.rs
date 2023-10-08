@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::error;
-use reqwest::{Error, Request, RequestBuilder, Response};
+
 use async_trait::async_trait;
-use crate::HttpRequester;
+use reqwest::{Error, RequestBuilder, Response};
+
+use crate::{HttpRequester, Request};
 
 pub struct StepManager {
     handlers: HashMap<String, Box<dyn Stepper>>,
@@ -50,84 +52,118 @@ impl Bot {
         Bot { steps }
     }
 
-    pub async fn handle_step(&mut self, step_id: String) -> Result<StepperResponse, Box<dyn error::Error>> {
+    pub async fn handle_step(&mut self, step_id: String) -> Result<StepperStore, Box<dyn error::Error>> {
         let step = match self.steps.get(&step_id) {
             Some(step) => step,
             None => return Err(Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "step not found"))),
         };
 
-        let s = step.on_request();
+        let req = step.on_request();
+        let mut store = Self::new_stepper_store(req);
 
-        match step.execute(s).await {
-            Ok(res) => {
-                println!("{:?}", &res.response.as_ref().unwrap());
-                Ok(res)
-            }
-            Err(err) => Err(Box::try_from(err).unwrap()),
+        let req_builder = store.request_builder.take().unwrap();
+        let res = req_builder.send().await?;
+
+        if !res.status().is_success() {
+            return Ok(store);
         }
+
+        store.response = Some(res);
+        step.on_success(&mut store);  // Using the reference
+
+        Ok(store)
+    }
+
+    fn new_stepper_store(req: Request) -> StepperStore {
+        let http_req: HttpRequester = HttpRequester::new();
+        let req_builder = http_req.build_reqwest(req).unwrap();
+
+        StepperStore::new(
+            http_req,
+            Some(req_builder),
+            None,
+            None,
+        )
     }
 }
 
 #[async_trait]
 pub trait Stepper {
     fn name(&self) -> &'static str;
-    fn on_request(&mut self) -> StepperResponse;
-    async fn on_success(self, res: &StepperResponse);
+    fn on_request(&mut self) -> Request;
+    fn on_success(&self, store: &mut StepperStore);
     fn on_error(&self, err: Error);
     fn on_timeout(&self);
-    async fn execute(&self, res: StepperResponse) -> Result<StepperResponse, Error>;
+    // async fn execute(&self, res: StepperResponse) -> Result<StepperResponse, Error>;
 }
 
-pub struct StepperResponse {
+pub struct StepperStore {
     pub http_requester: HttpRequester,
     pub request_builder: Option<RequestBuilder>,
     pub response: Option<Response>,
+    pub next_step: Option<String>,
 }
 
-impl StepperResponse {
-    pub fn new(http_requester: HttpRequester, request_builder: Option<RequestBuilder>, response: Option<Response>) -> Self {
+impl StepperStore {
+    pub fn new(
+        http_requester: HttpRequester,
+        request_builder: Option<RequestBuilder>,
+        response: Option<Response>,
+        next_step: Option<String>,
+    ) -> Self {
         Self {
             http_requester,
             request_builder,
             response,
+            next_step,
         }
+    }
+
+    pub fn set_next_step(&mut self, step: String) {
+        self.next_step = Some(step);
+    }
+
+    pub fn get_next_step(&self) -> Option<String> {
+        self.next_step.clone()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use reqwest::Method;
+    use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+
+    use crate::Request;
+
+    use super::*;
+
     #[derive(Clone, Copy)]
     struct RobotsTxt;
 
     #[async_trait]
     impl Stepper for RobotsTxt {
         fn name(&self) -> &'static str { "RobotsTxt" }
-        fn on_request(&mut self) -> StepperResponse {
-            let req = HttpRequester::new();
-
+        
+        fn on_request(&mut self) -> Request {
             let mut headers = HeaderMap::new();
             headers.insert(USER_AGENT, HeaderValue::from_static("reqwest"));
 
-            let builder = req.build_reqwest(Request {
+            Request {
                 method: Method::GET,
                 url: "https://google.com".to_string(),
                 headers: Some(headers),
                 timeout: Some(Duration::new(30, 0)),
                 body: None,
-            }).unwrap();
-
-            StepperResponse {
-                http_requester: req,
-                request_builder: Some(builder),
-                response: None,
             }
         }
 
-        fn on_success(self, res: StepperResponse) {
-            todo!()
+        fn on_success(&self, store: &mut StepperStore) {
+            store.set_next_step("RobotsTxt".to_string());
         }
 
-        fn on_error(&self, err: Error) {
+        fn on_error(&self, _err: Error) {
             todo!()
         }
 
@@ -135,25 +171,19 @@ mod tests {
             todo!()
         }
 
-        async fn execute(&self, mut response: StepperResponse) -> Result<StepperResponse, Error> {
-            let request_builder = response.request_builder.take().unwrap();
-            let res = &request_builder.send().await?;
-
-            if !res.status().is_success() {
-                println!("failed: {}", res.status());
-                return Ok(response);
-            }
-
-            Ok(response)
-        }
+        // async fn execute(&self, mut response: StepperResponse) -> Result<StepperResponse, Error> {
+        //     let request_builder = response.request_builder.take().unwrap();
+        //     let res = &request_builder.send().await?;
+        //
+        //     if !res.status().is_success() {
+        //         println!("failed: {}", res.status());
+        //         return Ok(response);
+        //     }
+        //
+        //     Ok(response)
+        // }
     }
 
-
-    use std::time::Duration;
-    use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
-    use reqwest::{Method, Response};
-    use crate::{HttpRequester, Request};
-    use super::*;
 
     #[test]
     fn it_initializes() {
@@ -168,5 +198,23 @@ mod tests {
         bot.steps.insert(step);
         assert_eq!(bot.steps.len(), 1);
         assert!(bot.steps.contains_step(step));
+    }
+
+    #[tokio::test]
+    async fn bot_should_handle_step_as_expected() {
+        let mut bot = Bot::new();
+        let step = RobotsTxt {};
+        bot.steps.insert(step);
+        bot.handle_step(step.name().to_string()).await.expect("TODO: panic message");
+    }
+
+    #[tokio::test]
+    async fn bot_should_have_next_step_in_store_as_expected() {
+        let mut bot = Bot::new();
+        let step = RobotsTxt {};
+        bot.steps.insert(step);
+
+        let response = bot.handle_step(step.name().to_string()).await.expect("TODO: panic message");
+        assert_eq!(response.next_step, Some("RobotsTxt".to_string()));
     }
 }
