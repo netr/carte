@@ -88,13 +88,14 @@ impl Bot {
         let status_codes = req.status_codes.clone();
         let req_builder = http_req.build_reqwest(req).unwrap();
 
-        StepperStore::new(
-            http_req,
-            Some(req_builder),
-            None,
-            None,
-            status_codes,
-        )
+        StepperStore {
+            http_requester: http_req,
+            request_builder: Some(req_builder),
+            response: None,
+            next_step: None,
+            success_codes: status_codes,
+            time_elapsed: 0,
+        }
     }
 }
 
@@ -113,34 +114,25 @@ pub struct StepperStore {
     pub request_builder: Option<RequestBuilder>,
     pub response: Option<Response>,
     pub next_step: Option<String>,
-    pub time_elapsed: u64,
     pub success_codes: Option<Vec<u16>>,
+    pub time_elapsed: u64,
 }
 
 impl StepperStore {
-    pub fn new(
-        http_requester: HttpRequester,
-        request_builder: Option<RequestBuilder>,
-        response: Option<Response>,
-        next_step: Option<String>,
-        success_codes: Option<Vec<u16>>,
-    ) -> Self {
-        Self {
-            http_requester,
-            request_builder,
-            response,
-            next_step,
-            time_elapsed: 0,
-            success_codes,
-        }
-    }
-
     pub fn set_next_step(&mut self, step: String) {
         self.next_step = Some(step);
     }
 
     pub fn get_next_step(&self) -> Option<String> {
         self.next_step.clone()
+    }
+
+    pub fn get_time_elapsed(&self) -> u64 {
+        self.time_elapsed
+    }
+
+    pub fn set_time_elapsed(&mut self, time_elapsed: u64) {
+        self.time_elapsed = time_elapsed;
     }
 }
 
@@ -210,13 +202,14 @@ mod tests {
     #[tokio::test]
     async fn bot_should_have_next_step_in_store_as_expected() {
         let step = RobotsTxt {};
-        let store = &mut StepperStore::new(
-            HttpRequester::new(),
-            None,
-            None,
-            None,
-            None,
-        );
+        let store = &mut StepperStore {
+            http_requester: HttpRequester::new(),
+            request_builder: None,
+            response: None,
+            next_step: None,
+            time_elapsed: 0,
+            success_codes: None,
+        };
         let _ = step.on_success(store);
 
         assert_eq!(store.next_step, Some("RobotsTxt".to_string()));
