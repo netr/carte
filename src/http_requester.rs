@@ -206,6 +206,7 @@ mod tests {
             headers: Some(headers),
             timeout: Some(Duration::new(35, 0)),
             body: Some(Body::from("fuck yea".to_string())),
+            status_codes: Some(vec![200]),
         };
 
         match http.build_reqwest(req) {

@@ -10,6 +10,7 @@ pub struct Request {
     pub headers: Option<HeaderMap>,
     pub timeout: Option<Duration>,
     pub body: Option<Body>,
+    pub status_codes: Option<Vec<u16>>,
 }
 
 
@@ -21,6 +22,7 @@ impl Request {
             headers: None,
             timeout: Some(Duration::new(30, 0)),
             body: None,
+            status_codes: None,
         }
     }
 }
@@ -33,6 +35,7 @@ impl Default for Request {
             headers: None,
             timeout: Some(Duration::new(30, 0)),
             body: None,
+            status_codes: None,
         }
     }
 }
