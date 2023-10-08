@@ -184,8 +184,8 @@ mod tests {
 
     #[async_trait]
     impl Stepable for RobotsTxt {
-        fn name(&self) -> &'static str {
-            "RobotsTxt"
+        fn name(&self) -> String {
+            "RobotsTxt".parse().unwrap()
         }
 
         fn on_request(&mut self) -> Request {
@@ -208,7 +208,7 @@ mod tests {
             ctx.set_next_step("RobotsTxt".to_string());
         }
 
-        fn on_error(&self, _err: Error) {
+        fn on_error(&self, _err: StepError) {
             todo!()
         }
 
