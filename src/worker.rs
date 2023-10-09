@@ -57,7 +57,6 @@ impl Worker {
             Err(err) => {
                 if err.is_timeout() {
                     step.on_timeout(&mut self.ctx);
-
                     return Err(Self::timeout_error());
                 }
 
@@ -110,10 +109,6 @@ impl Worker {
             None => 300 > status_code && status_code >= 200,
         }
     }
-
-    // if the request is successful, call on_success() on the step
-    // if the request is unsuccessful, call on_error() on the step
-    // stop timers and store the time elapsed in the context
 }
 
 #[cfg(test)]
