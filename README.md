@@ -32,18 +32,18 @@ Work in progress, subject to change. Not ready for production use.
 ## Usage for a 2 step bot
 
 ```rust
-use mimicr::{Bot, Context, Request, StepError, Stepable};
+use mimicr::{Worker, Context, Request, StepError, Stepable};
 use std::future::Future;
 use std::pin::Pin;
 use std::time::Duration;
 
 // TODO: incorporate handle_recursive into Bot
-async fn handle_recursive(mut bot: Bot, step: String) -> Result<(), reqwest::Error> {
-    match bot.handle_step(step).await {
-        Ok(res) => {
-            if let Some(next_step) = res.next_step {
+async fn handle_recursive(mut worker: Worker, step: String) -> Result<(), reqwest::Error> {
+    match worker.try_step(step.as_str()).await {
+        Ok(..) => {
+            if let Some(next_step) = worker.ctx.get_next_step() {
                 let fut: Pin<Box<dyn Future<Output=Result<(), reqwest::Error>>>> =
-                    Box::pin(handle_recursive(bot, next_step));
+                    Box::pin(handle_recursive(worker, next_step));
                 fut.await?;
             }
         }
@@ -54,10 +54,10 @@ async fn handle_recursive(mut bot: Bot, step: String) -> Result<(), reqwest::Err
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
-    let mut bot: Bot = Bot::new();
-    bot.steps
-        .insert_many(vec![Box::new(Google {}), Box::new(Facebook {})]);
-    handle_recursive(bot, Steps::Google.to_string()).await
+    let mut worker: Worker = Worker::new();
+    worker.add_many_steps(vec![Arc::new(RobotsTxt {}), Arc::new(LoginPage {})]);
+
+    handle_recursive(worker, Steps::RobotsTxt.to_string()).await
 }
 
 enum Steps {
@@ -102,13 +102,12 @@ impl Stepable for Google {
     }
 
     fn on_success(&self, ctx: &mut Context) {
-        let res = ctx.response.as_ref().unwrap();
         println!(
-            "Successfully fetched: {} in {} ms",
-            ctx.current_step.as_ref().unwrap(),
-            ctx.time_elapsed,
+            "[{}] Success! URL: {} - Time: {}",
+            ctx.get_current_step().unwrap(),
+            ctx.get_url(),
+            ctx.get_time_elapsed_as_string(),
         );
-
         ctx.set_next_step(Steps::Facebook.to_string());
     }
 
@@ -140,11 +139,11 @@ impl Stepable for Facebook {
     }
 
     fn on_success(&self, ctx: &mut Context) {
-        let res = ctx.response.as_ref().unwrap();
         println!(
-            "Successfully fetched: {} in {} ms",
-            ctx.current_step.as_ref().unwrap(),
-            ctx.time_elapsed,
+            "[{}] Success! URL: {} - Time: {}",
+            ctx.get_current_step().unwrap(),
+            ctx.get_url(),
+            ctx.get_time_elapsed_as_string(),
         );
         // without setting a next_step, the bot will stop
     }
