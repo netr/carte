@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 use crate::bot::StepManager;
-use crate::{Context, Request, StepError, Stepable};
+use crate::context::Context;
+use crate::{StepError, Stepable};
 use std::io::Error;
 use std::sync::Arc;
 
@@ -37,41 +38,6 @@ impl Worker {
         }
     }
 
-    // call on_request() on the step
-    // use the request to populate the request in the context
-    // set current step in context
-    fn update_ctx_with_request(
-        &mut self,
-        name: &str,
-        req: Request,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        self.ctx.http_requester.settings.set_proxy(req.proxy());
-        self.ctx
-            .http_requester
-            .settings
-            .set_user_agent(req.user_agent());
-        self.ctx
-            .http_requester
-            .settings
-            .set_compression(req.is_compressed());
-
-        self.ctx.status_codes = req.status_codes().clone();
-
-        if let Ok(builder) = self.ctx.http_requester.build_reqwest(req.clone()) {
-            self.ctx.request_builder = Some(builder);
-        } else {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unable to build request",
-            )));
-        }
-
-        self.ctx.current_step = Some(name.to_string());
-        self.ctx.request = req;
-
-        Ok(())
-    }
-
     // start the instant timer to run the step
     // run send() on the request_builder
     // stop the instant timer
@@ -79,7 +45,8 @@ impl Worker {
         let step = self.get_step(name).unwrap();
         let req = step.on_request();
 
-        self.update_ctx_with_request(name, req)?;
+        self.ctx.update_from_request(req)?;
+        self.ctx.set_current_step(name.to_string());
 
         let req_builder = self.ctx.request_builder.take().unwrap();
 
@@ -119,7 +86,7 @@ impl Worker {
             }
         };
 
-        self.ctx.set_response(body);
+        self.ctx.set_response_body(body);
         step.on_success(&mut self.ctx);
 
         Ok(())
@@ -233,7 +200,7 @@ mod tests {
         let step = worker.get_step("RobotsTxt").unwrap();
         let req = step.on_request();
 
-        match worker.update_ctx_with_request("RobotsTxt", req) {
+        match worker.ctx.update_from_request(req) {
             Ok(_) => {
                 assert_eq!(worker.ctx.request.method(), "GET");
                 assert_eq!(worker.ctx.request.url(), "https://google.com");
@@ -243,6 +210,13 @@ mod tests {
                 assert!(false);
             }
         }
+    }
+
+    #[test]
+    fn it_should_update_current_step() {
+        let mut worker = Worker::new();
+        worker.ctx.set_current_step("RobotsTxt".to_string());
+        assert_eq!(worker.ctx.get_current_step().unwrap(), "RobotsTxt");
     }
 
     #[tokio::test]

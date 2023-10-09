@@ -1,12 +1,9 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use encoding_rs::{Encoding, UTF_8};
-use reqwest::RequestBuilder;
-use serde::de::DeserializeOwned;
 
+use crate::context::Context;
 use crate::{HttpRequester, Request, StepError};
 
 pub struct Bot {
@@ -75,7 +72,7 @@ impl Bot {
         }
 
         // Everything is good, so call the step's `on_success` method.
-        ctx.response = None;
+        ctx.response_body = None;
         step.on_success(&mut ctx); // Using the reference
 
         Ok(ctx)
@@ -97,126 +94,11 @@ impl Bot {
             current_step: None,
             http_requester: http_req,
             request_builder: Some(req_builder),
-            response: None,
+            response_body: None,
             next_step: None,
             status_codes,
             time_elapsed: 0,
         }
-    }
-}
-
-/// The context for the bots current step's execution.
-/// This is passed to the step's `on_success` and `on_error` methods.
-pub struct Context {
-    /// The original request struct.
-    pub request: Request,
-    /// The next step to be executed.
-    pub current_step: Option<String>,
-    /// The HTTP requester which manages cookie store and client settings.
-    pub http_requester: HttpRequester,
-    /// The request builder from reqwest.
-    pub request_builder: Option<RequestBuilder>,
-    /// The response from the request.
-    pub response: Option<bytes::Bytes>,
-    /// The next step to be executed.
-    pub next_step: Option<String>,
-    /// If status codes are provided, then the response status code must be in the list.
-    pub status_codes: Option<Vec<u16>>,
-    /// The time elapsed in milliseconds for the request.
-    pub time_elapsed: u64,
-}
-
-impl Context {
-    pub fn new() -> Self {
-        let request = Request::default();
-        let http_requester = HttpRequester::new();
-        let request_builder = http_requester.build_reqwest(request.clone()).unwrap();
-
-        Context {
-            request,
-            current_step: None,
-            http_requester,
-            request_builder: Some(request_builder),
-            response: None,
-            next_step: None,
-            status_codes: None,
-            time_elapsed: 0,
-        }
-    }
-
-    pub fn set_next_step(&mut self, step: String) {
-        self.next_step = Some(step);
-    }
-
-    pub fn clear_next_step(&mut self) {
-        self.next_step = None;
-    }
-
-    pub fn get_next_step(&self) -> Option<String> {
-        self.next_step.clone()
-    }
-
-    pub fn get_time_elapsed(&self) -> u64 {
-        self.time_elapsed
-    }
-
-    pub fn set_time_elapsed(&mut self, time_elapsed: u64) {
-        self.time_elapsed = time_elapsed;
-    }
-
-    pub fn set_response(&mut self, res: bytes::Bytes) {
-        self.response = Some(res);
-    }
-
-    pub fn set_request_builder(&mut self, req_builder: RequestBuilder) {
-        self.request_builder = Some(req_builder);
-    }
-
-    pub fn body_bytes(&self) -> Result<bytes::Bytes, Box<dyn Error>> {
-        if self.response.is_none() {
-            return Err(Self::no_body_error());
-        }
-
-        Ok(self.response.clone().unwrap())
-    }
-
-    pub fn get_current_step(&self) -> Option<String> {
-        self.current_step.clone()
-    }
-
-    pub fn get_time_elapsed_as_string(&self) -> String {
-        format!("{} ms", self.time_elapsed)
-    }
-
-    pub fn get_url(&self) -> String {
-        self.request.url().clone()
-    }
-
-    pub fn body_text(&self) -> Result<String, Box<dyn Error>> {
-        if self.response.is_none() {
-            return Err(Self::no_body_error());
-        }
-
-        let encoding = Encoding::for_label(b"utf-8").unwrap_or(UTF_8);
-        let (text, _, _) = encoding.decode(&self.response.as_ref().unwrap());
-
-        Ok(text.to_string())
-    }
-
-    fn no_body_error() -> Box<dyn Error> {
-        return Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "No body has been set from the request.",
-        ));
-    }
-
-    pub async fn body_json<T: DeserializeOwned>(&self) -> Result<T, Box<dyn Error>> {
-        if self.response.is_none() {
-            return Err(Self::no_body_error());
-        }
-
-        serde_json::from_slice(&self.response.as_ref().unwrap())
-            .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })
     }
 }
 
@@ -344,7 +226,7 @@ mod tests {
             current_step: None,
             http_requester: HttpRequester::new(),
             request_builder: None,
-            response: None,
+            response_body: None,
             next_step: None,
             time_elapsed: 0,
             status_codes: None,
@@ -361,53 +243,5 @@ mod tests {
 
         assert_eq!(req.method(), Method::GET);
         assert_eq!(req.status_codes(), Some(vec![200]));
-    }
-
-    #[test]
-    fn context_should_get_current_step_without_one_set() {
-        let ctx = Context::new();
-        assert_eq!(ctx.get_current_step(), None);
-    }
-
-    #[test]
-    fn context_should_get_url_without_one_set() {
-        let ctx = Context::new();
-        assert_eq!(ctx.get_url(), "/");
-    }
-
-    #[test]
-    fn context_body_test_should_throw_error_if_not_initialized() {
-        let ctx = Context::new();
-
-        let err = ctx.body_text().unwrap_err();
-        assert_eq!(err.to_string(), "No body has been set from the request.");
-    }
-
-    #[test]
-    fn context_body_bytes_should_throw_error_if_not_initialized() {
-        let ctx = Context::new();
-
-        let err = ctx.body_bytes().unwrap_err();
-        assert_eq!(err.to_string(), "No body has been set from the request.");
-    }
-
-    #[tokio::test]
-    async fn context_body_json_should_mock_response_and_get_name() {
-        let mut ctx = Context::new();
-        let res = bytes::Bytes::from_static(b"{\"name\": \"test\"}");
-        ctx.set_response(res);
-
-        let json: serde_json::Value = ctx.body_json().await.unwrap();
-        assert_eq!(json["name"], "test");
-    }
-
-    #[tokio::test]
-    async fn context_body_json_should_return_error_if_invalid_json() {
-        let mut ctx = Context::new();
-        let res = bytes::Bytes::from_static(b"{\"name\": \"test\"");
-        ctx.set_response(res);
-
-        let err = ctx.body_json::<serde_json::Value>().await.unwrap_err();
-        assert!(err.to_string().len() > 0);
     }
 }
