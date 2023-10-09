@@ -23,7 +23,7 @@ Work in progress, subject to change. Not ready for production use.
 - [x] Set up a `Request` builder pattern to make it less verbose to create requests
 - [X] Move `Context` to its own module and remove `pub` from `Context` struct
 - [ ] Allow for `shared state` such as databases or other resources
-- [ ] Allow for skipping steps during `on_request()`
+- [X] Allow for skipping steps during `on_request()`
 - [ ] Create a more robust `example using an api` that requires authentication, session management, etc.
 - [ ] More robust timeout and pause functionality [Timeout, AfterSuccess, AfterError, etc]
 - [ ] Move `Context` to a `ContextBuilder` pattern to make it less verbose to create contexts?
