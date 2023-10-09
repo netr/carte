@@ -36,12 +36,19 @@ impl Bot {
         let res = match req_builder.send().await {
             Ok(res) => res,
             Err(err) => {
-                step.on_error(StepError::ReqwestError(err.to_string()));
+                ctx.set_time_elapsed(stop_watch.elapsed().as_millis() as u64);
+
+                if err.is_timeout() {
+                    step.on_timeout(&mut ctx);
+                    return Err(StepError::ReqwestError(err.to_string()));
+                }
+
+                step.on_error(&mut ctx, StepError::ReqwestError(err.to_string()));
                 return Err(StepError::ReqwestError(err.to_string()));
             }
         };
 
-        ctx.time_elapsed = stop_watch.elapsed().as_millis() as u64;
+        ctx.set_time_elapsed(stop_watch.elapsed().as_millis() as u64);
 
         // Check if the status code is in the list of expected status codes.
         let status_code = res.status().as_u16();
@@ -59,7 +66,7 @@ impl Bot {
                 expected_codes.cloned().unwrap_or_else(Vec::new),
             );
 
-            step.on_error(error.clone());
+            step.on_error(&mut ctx, error.clone());
             return Err(error);
         }
 
@@ -79,9 +86,10 @@ impl Bot {
         http_req.settings.set_user_agent(req.user_agent());
         http_req.settings.set_compression(req.is_compressed());
 
-        let req_builder = http_req.build_reqwest(req).unwrap();
+        let req_builder = http_req.build_reqwest(req.clone()).unwrap();
 
         Context {
+            request: req,
             current_step: None,
             http_requester: http_req,
             request_builder: Some(req_builder),
@@ -96,6 +104,8 @@ impl Bot {
 /// The context for the bots current step's execution.
 /// This is passed to the step's `on_success` and `on_error` methods.
 pub struct Context {
+    /// The original request struct.
+    pub request: Request,
     /// The next step to be executed.
     pub current_step: Option<String>,
     /// The HTTP requester which manages cookie store and client settings.
@@ -139,8 +149,8 @@ pub trait Stepable {
     fn name(&self) -> String;
     fn on_request(&mut self) -> Request;
     fn on_success(&self, ctx: &mut Context);
-    fn on_error(&self, err: StepError);
-    fn on_timeout(&self);
+    fn on_error(&self, ctx: &mut Context, err: StepError);
+    fn on_timeout(&self, ctx: &mut Context);
     // async fn execute(&self, res: StepperResponse) -> Result<StepperResponse, Error>;
 }
 
@@ -226,11 +236,11 @@ mod tests {
             ctx.set_next_step("RobotsTxt".to_string());
         }
 
-        fn on_error(&self, _err: StepError) {
+        fn on_error(&self, ctx: &mut Context, _err: StepError) {
             todo!()
         }
 
-        fn on_timeout(&self) {
+        fn on_timeout(&self, ctx: &mut Context) {
             todo!()
         }
     }
@@ -254,6 +264,7 @@ mod tests {
     async fn bot_should_have_next_step_in_store_as_expected() {
         let step = RobotsTxt {};
         let store = &mut Context {
+            request: Request::default(),
             current_step: None,
             http_requester: HttpRequester::new(),
             request_builder: None,
