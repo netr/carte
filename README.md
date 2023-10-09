@@ -15,6 +15,17 @@ in, maintaining sessions, and more.
 
 Work in progress, subject to change. Not ready for production use.
 
+## Todo / Ideas
+
+- [x] Basic functionality for a simple recursive bot with multiple steps
+- [x] Create a macro for hdr!(r#"Content-type: application/json#Accept: application/json") to make it easier to create
+  headers
+- [ ] Create a more robust example using an api that requires authentication, session management, etc.
+- [ ] Allow for shared state such as databases or other resources
+- [ ] More robust custom response and requests in the context
+- [ ] Allow for skipping steps during on_request()
+- [ ] Allow for adding pauses between steps
+
 ## Usage for a 2 step bot
 
 ```rust
