@@ -72,7 +72,7 @@ impl Bot {
 
     fn new_context(req: Request) -> Context {
         let http_req: HttpRequester = HttpRequester::new();
-        let status_codes = req.status_codes.clone();
+        let status_codes = req.status_codes().clone();
         let req_builder = http_req.build_reqwest(req).unwrap();
 
         Context {
@@ -266,7 +266,7 @@ mod tests {
         let mut step = RobotsTxt {};
         let req = step.on_request();
 
-        assert_eq!(req.method, Method::GET);
-        assert_eq!(req.status_codes, Some(vec![200]));
+        assert_eq!(req.method(), Method::GET);
+        assert_eq!(req.status_codes(), Some(vec![200]));
     }
 }

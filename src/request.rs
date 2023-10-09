@@ -5,15 +5,15 @@ use reqwest::{Body, Method};
 
 #[derive(Debug)]
 pub struct Request {
-    pub method: Method,
-    pub url: String,
-    pub headers: Option<HeaderMap>,
-    pub timeout: Option<Duration>,
-    pub body: Option<Body>,
-    pub status_codes: Option<Vec<u16>>,
-    pub proxy: Option<String>,
-    pub user_agent: Option<String>,
-    pub gzip: bool,
+    method: Method,
+    url: String,
+    headers: Option<HeaderMap>,
+    timeout: Option<Duration>,
+    body: Option<Body>,
+    status_codes: Option<Vec<u16>>,
+    proxy: Option<String>,
+    user_agent: Option<String>,
+    gzip: bool,
 }
 
 impl Request {
@@ -31,9 +31,21 @@ impl Request {
         }
     }
 
+    pub fn method(&self) -> Method {
+        self.method.clone()
+    }
+
+    pub fn url(&self) -> &String {
+        &self.url
+    }
+
     pub fn with_headers(mut self, headers: HeaderMap) -> Self {
         self.headers = Some(headers);
         self
+    }
+
+    pub fn headers(&self) -> Option<HeaderMap> {
+        self.headers.clone()
     }
 
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
@@ -41,9 +53,17 @@ impl Request {
         self
     }
 
+    pub fn timeout(&self) -> Option<Duration> {
+        self.timeout.clone()
+    }
+
     pub fn with_body(mut self, body: Body) -> Self {
         self.body = Some(body);
         self
+    }
+
+    pub fn body(self) -> Option<Body> {
+        self.body
     }
 
     pub fn with_status_codes(mut self, status_codes: Vec<u16>) -> Self {
@@ -51,9 +71,17 @@ impl Request {
         self
     }
 
+    pub fn status_codes(&self) -> Option<Vec<u16>> {
+        self.status_codes.clone()
+    }
+
     pub fn with_proxy(mut self, proxy: String) -> Self {
         self.proxy = Some(proxy);
         self
+    }
+
+    pub fn proxy(&self) -> Option<&String> {
+        self.proxy.as_ref()
     }
 
     pub fn with_user_agent(mut self, user_agent: String) -> Self {
@@ -61,9 +89,17 @@ impl Request {
         self
     }
 
+    pub fn user_agent(&self) -> Option<&String> {
+        self.user_agent.as_ref()
+    }
+
     pub fn compressed(mut self) -> Self {
         self.gzip = true;
         self
+    }
+
+    pub fn is_compressed(&self) -> bool {
+        self.gzip
     }
 
     pub fn no_compression(mut self) -> Self {
@@ -170,11 +206,11 @@ mod tests {
             .build();
         assert_eq!(req.method, Method::GET);
         assert_eq!(req.url, "https://google.com");
-        assert_eq!(req.headers.unwrap().len(), 1);
-        assert_eq!(req.timeout.unwrap().as_secs(), 710);
-        assert_eq!(req.status_codes.unwrap().len(), 3);
-        assert_eq!(req.proxy.unwrap(), "https://secure.example");
-        assert_eq!(req.user_agent.unwrap(), "reqwest");
-        assert_eq!(req.gzip, false);
+        assert_eq!(req.headers().unwrap().len(), 1);
+        assert_eq!(req.timeout().unwrap().as_secs(), 710);
+        assert_eq!(req.status_codes().unwrap().len(), 3);
+        assert_eq!(req.proxy().unwrap(), "https://secure.example");
+        assert_eq!(req.user_agent().unwrap(), "reqwest");
+        assert_eq!(req.is_compressed(), false);
     }
 }
