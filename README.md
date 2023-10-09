@@ -20,10 +20,12 @@ Work in progress, subject to change. Not ready for production use.
 - [x] Basic functionality for a simple recursive bot with multiple steps
 - [x] Create a macro for `hdr!`(r#"Content-type: application/json#Accept: application/json") to make it easier to create
   headers
-- [ ] Allow for file uploads
 - [x] Setup a `Request` builder pattern to make it less verbose to create requests
+- [ ] Move `Context` to a `ContextBuilder` pattern to make it less verbose to create contexts?
+- [ ] Move `Context` to its own module and remove `pub` from `Context` struct
 - [ ] Create a more robust `example using an api` that requires authentication, session management, etc.
 - [ ] Allow for `shared state` such as databases or other resources
+- [ ] Allow for file uploads
 - [ ] More robust custom response and requests in the `context`
 - [ ] Allow for skipping steps during `on_request()`
 - [ ] More robust timeout and pause functionality [Timeout, AfterSuccess, AfterError, etc]
