@@ -172,11 +172,11 @@ mod tests {
 
         fn on_success(&self, ctx: &mut Context) {
             eprintln!(
-                "Successfully fetched: {} in {} ms\n\nURL: {}\nBody: {:?}",
-                ctx.current_step.as_ref().unwrap(),
-                ctx.time_elapsed,
-                ctx.request.url().clone(),
-                ctx.body_text(),
+                "Successfully fetched: {} in {}\n\nURL: {}\nBody: {:?}",
+                ctx.get_current_step().unwrap(),
+                ctx.get_time_elapsed_as_string(),
+                ctx.get_url(),
+                ctx.body_text().unwrap(),
             );
         }
 
