@@ -39,6 +39,7 @@ impl Default for Request {
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! hdr {
     ($text:expr) => {{
         let mut headers = HeaderMap::new();
