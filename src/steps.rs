@@ -36,10 +36,9 @@ impl StepManager {
     pub fn insert_arc(&mut self, step: Arc<dyn Stepable>) {
         self.handlers.insert(step.name().parse().unwrap(), step);
     }
-
     pub fn insert_many(&mut self, steps: Vec<Arc<dyn Stepable>>) {
         for step in steps {
-            self.handlers.insert(step.name().parse().unwrap(), step);
+            self.insert_arc(step);
         }
     }
 

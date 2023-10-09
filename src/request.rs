@@ -16,8 +16,12 @@ pub struct Request {
     proxy: Option<Proxy>,
     user_agent: Option<String>,
     gzip: bool,
+    skip_to: Option<String>,
 }
 
+/// A builder for a request.
+/// Note: This needs a skip() method to skip a request.
+/// Also it needs a skip_to() method to skip to a specific step.
 impl Request {
     pub fn new(method: Method, url: String) -> Self {
         Self {
@@ -31,6 +35,7 @@ impl Request {
             proxy: None,
             user_agent: None,
             gzip: true,
+            skip_to: None,
         }
     }
 
@@ -127,6 +132,19 @@ impl Request {
         self
     }
 
+    pub fn skip_to(mut self, step: Option<String>) -> Self {
+        self.skip_to = step;
+        self
+    }
+
+    pub fn is_skipped(&self) -> bool {
+        self.skip_to.is_some()
+    }
+
+    pub fn get_skip_to_step(&self) -> Option<String> {
+        self.skip_to.clone()
+    }
+
     pub fn build(self) -> Self {
         self
     }
@@ -145,6 +163,7 @@ impl Default for Request {
             proxy: None,
             user_agent: None,
             gzip: true,
+            skip_to: None,
         }
     }
 }
@@ -261,6 +280,14 @@ mod tests {
     fn it_should_return_no_headers_if_empty() {
         let headers = hdr!();
         assert_eq!(headers.len(), 0);
+    }
+
+    #[test]
+    fn it_should_skip_to_a_step() {
+        let req = Request::new(Method::GET, "https://google.com".to_string())
+            .skip_to(Some("RobotsTxt".to_string()))
+            .build();
+        assert_eq!(req.get_skip_to_step().unwrap(), "RobotsTxt");
     }
 
     #[test]

@@ -49,6 +49,12 @@ impl Worker {
         let step = self.get_step(name).unwrap();
         let req = step.on_request();
 
+        if req.get_skip_to_step().is_some() {
+            self.ctx
+                .set_next_step(req.get_skip_to_step().unwrap().clone());
+            return Ok(());
+        }
+
         self.ctx.update_from_request(req)?;
         self.ctx.set_current_step(name.to_string());
 
@@ -129,10 +135,13 @@ mod tests {
     #[derive(Clone, Copy)]
     struct RobotsTxt;
 
+    const ROBOTS_TXT: &str = "RobotsTxt";
+    const SKIPPABLE_STEP: &str = "SkippableStep";
+
     #[async_trait]
     impl Stepable for RobotsTxt {
         fn name(&self) -> String {
-            String::from("RobotsTxt")
+            String::from(ROBOTS_TXT)
         }
 
         fn on_request(&self) -> Request {
@@ -158,6 +167,33 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Copy)]
+    struct SkippableStep;
+
+    #[async_trait]
+    impl Stepable for SkippableStep {
+        fn name(&self) -> String {
+            String::from(SKIPPABLE_STEP)
+        }
+
+        fn on_request(&self) -> Request {
+            Request::new(Method::GET, "https://google.com".to_string())
+                .skip_to(Some(ROBOTS_TXT.to_string()))
+        }
+
+        fn on_success(&self, _ctx: &mut Context) {
+            todo!("This step should never be called")
+        }
+
+        fn on_error(&self, _ctx: &mut Context, _err: StepError) {
+            todo!("This step should never be called")
+        }
+
+        fn on_timeout(&self, _ctx: &mut Context) {
+            todo!("This step should never be called")
+        }
+    }
+
     #[test]
     fn it_should_add_step() {
         let mut worker = Worker::new();
@@ -180,8 +216,8 @@ mod tests {
         let mut worker = Worker::new();
         worker.add_step(RobotsTxt);
 
-        let step = worker.get_step("RobotsTxt").unwrap();
-        assert_eq!(step.name(), "RobotsTxt");
+        let step = worker.get_step(ROBOTS_TXT).unwrap();
+        assert_eq!(step.name(), ROBOTS_TXT);
     }
 
     #[test]
@@ -189,7 +225,7 @@ mod tests {
         let mut worker = Worker::new();
         worker.add_step(RobotsTxt);
 
-        let step = worker.get_step("RobotsTxt").unwrap();
+        let step = worker.get_step(ROBOTS_TXT).unwrap();
         let req = step.on_request();
         assert_eq!(req.method(), "GET");
     }
@@ -199,7 +235,7 @@ mod tests {
         let mut worker = Worker::new();
         worker.add_step(RobotsTxt);
 
-        let step = worker.get_step("RobotsTxt").unwrap();
+        let step = worker.get_step(ROBOTS_TXT).unwrap();
         let req = step.on_request();
 
         match worker.ctx.update_from_request(req) {
@@ -217,16 +253,20 @@ mod tests {
     #[test]
     fn it_should_update_current_step() {
         let mut worker = Worker::new();
-        worker.ctx.set_current_step("RobotsTxt".to_string());
-        assert_eq!(worker.ctx.get_current_step().unwrap(), "RobotsTxt");
+        worker.ctx.set_current_step(ROBOTS_TXT.to_string());
+        assert_eq!(worker.ctx.get_current_step().unwrap(), ROBOTS_TXT);
     }
 
+    /// This actually goes to https://google.com and fetches the page.
+    /// It's ignored because it can break if the internet is down.
+    /// It's here for testing purposes only.
     #[tokio::test]
+    #[ignore]
     async fn it_should_try_step() {
         let mut worker = Worker::new();
         worker.add_step(RobotsTxt);
 
-        match worker.try_step("RobotsTxt").await {
+        match worker.try_step(ROBOTS_TXT).await {
             Ok(_) => {
                 assert_eq!(worker.ctx.get_method(), "GET");
                 assert_eq!(worker.ctx.get_url(), "https://google.com");
@@ -237,6 +277,7 @@ mod tests {
             }
         }
     }
+
     #[test]
     fn check_status_codes_should_return_true_if_status_code_matches() {
         let mut worker = Worker::new();
@@ -269,5 +310,16 @@ mod tests {
 
         assert!(worker.check_status_code(200));
         assert!(!worker.check_status_code(404));
+    }
+
+    #[test]
+    fn it_should_skip_to_step() {
+        let mut worker = Worker::new();
+        worker.add_step(SkippableStep);
+
+        let step = worker.get_step(SKIPPABLE_STEP).unwrap();
+        let req = step.on_request();
+
+        assert_eq!(req.get_skip_to_step().unwrap(), ROBOTS_TXT);
     }
 }
