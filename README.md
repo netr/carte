@@ -1,5 +1,7 @@
 # Carte
 
+![carte github actions workflow](https://github.com/netr/carte/actions/workflows/carte.yml/badge.svg)
+
 Using this project as a learning experience for Rust.
 
 Rust library for working with HTTP requests to simulate a browser. The core concept of the library is to allow you to
