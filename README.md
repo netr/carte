@@ -18,13 +18,16 @@ Work in progress, subject to change. Not ready for production use.
 ## Todo / Ideas
 
 - [x] Basic functionality for a simple recursive bot with multiple steps
-- [x] Create a macro for hdr!(r#"Content-type: application/json#Accept: application/json") to make it easier to create
+- [x] Create a macro for `hdr!`(r#"Content-type: application/json#Accept: application/json") to make it easier to create
   headers
-- [ ] Create a more robust example using an api that requires authentication, session management, etc.
-- [ ] Allow for shared state such as databases or other resources
-- [ ] More robust custom response and requests in the context
-- [ ] Allow for skipping steps during on_request()
-- [ ] Allow for adding pauses between steps
+- [ ] Create a macro for `body!`(r#"{"key": "value"}"#) to make it easier to create bodies
+- [ ] Setup a `Request` builder pattern to make it less verbose to create requests
+- [ ] Create a more robust `example using an api` that requires authentication, session management, etc.
+- [ ] Allow for `shared state` such as databases or other resources
+- [ ] More robust custom response and requests in the `context`
+- [ ] Allow for skipping steps during `on_request()`
+- [ ] More robust timeout and pause functionality [Timeout, AfterSuccess, AfterError, etc]
+- [ ] Create a `curl command parser` to transform curl commands to mimicr steps
 
 ## Usage for a 2 step bot
 
@@ -86,10 +89,15 @@ impl Stepable for Google {
     }
 
     fn on_request(&mut self) -> Request {
+        let headers = hdr!(
+            r#"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36
+            Accept: */*"#
+        );
+
         Request {
             method: Method::GET,
             url: "https://google.com".to_string(),
-            headers: None,
+            headers: Some(headers),
             timeout: Some(Duration::new(30, 0)),
             body: None,
             status_codes: Some(vec![200]),
