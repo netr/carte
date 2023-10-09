@@ -92,6 +92,9 @@ impl HttpRequester {
         if let Some(b) = req.body() {
             client = client.body(b);
         }
+        if let Some(f) = req.multipart() {
+            client = client.multipart(f);
+        }
 
         Ok(client)
     }
@@ -113,7 +116,7 @@ fn new_cookie_store() -> Arc<CookieStoreMutex> {
 
 #[cfg(test)]
 mod tests {
-    use crate::request::MimicBody;
+    use crate::request::{MimicBody, MimicForm};
     use reqwest::header::HeaderValue;
     use reqwest::Proxy;
 
@@ -209,9 +212,37 @@ mod tests {
 
         match http.build_reqwest(req) {
             Ok(b) => {
+                println!("{:?}", b);
                 assert!(format!("{:?}", b).contains("method: POST"));
                 assert!(format!("{:?}", b).contains("google.com"));
                 assert!(format!("{:?}", b).contains("x-api-key"));
+            }
+            Err(_) => panic!("invalid"),
+        }
+    }
+
+    #[test]
+    fn it_should_build_a_request_with_multipart() {
+        let http = HttpRequester::new();
+        let mut headers = HeaderMap::new();
+        headers.insert("X-API-KEY", HeaderValue::from_static("1234"));
+
+        let form = MimicForm::new(
+            vec![("name".to_string(), "value".to_string())],
+            vec![("name".to_string(), vec![1, 2, 3])],
+        );
+
+        let req = Request::new(Method::POST, "https://google.com".to_string())
+            .with_headers(headers)
+            .with_multipart(form)
+            .with_status_codes(vec![200])
+            .build();
+
+        match http.build_reqwest(req) {
+            Ok(b) => {
+                println!("{:?}", b);
+                assert!(format!("{:?}", b).contains("method: POST"));
+                assert!(format!("{:?}", b).contains("multipart/form-data; boundary="));
             }
             Err(_) => panic!("invalid"),
         }

@@ -227,7 +227,6 @@ mod tests {
                 .with_headers(headers)
                 .with_timeout(Duration::new(30, 0))
                 .with_status_codes(vec![200])
-                .build()
         }
 
         fn on_success(&self, ctx: &mut Context) {
@@ -236,11 +235,11 @@ mod tests {
             ctx.set_next_step("RobotsTxt".to_string());
         }
 
-        fn on_error(&self, ctx: &mut Context, _err: StepError) {
+        fn on_error(&self, _ctx: &mut Context, _err: StepError) {
             todo!()
         }
 
-        fn on_timeout(&self, ctx: &mut Context) {
+        fn on_timeout(&self, _ctx: &mut Context) {
             todo!()
         }
     }
