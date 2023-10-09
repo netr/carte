@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::context::Context;
-use crate::{HttpRequester, Request, StepError};
+use crate::{Request, StepError};
 
 #[async_trait]
 pub trait Stepable {
@@ -21,6 +21,7 @@ pub struct StepManager {
     handlers: HashMap<String, Arc<dyn Stepable>>,
 }
 
+#[allow(dead_code)]
 impl StepManager {
     pub fn new() -> Self {
         let handlers = HashMap::new();
@@ -107,32 +108,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn it_initializes() {
-        let mut bot = Bot::new();
-        assert_eq!(bot.steps.len(), 0);
-    }
-
-    #[test]
-    fn it_adds_step() {
-        let mut bot = Bot::new();
-        let step = RobotsTxt {};
-        bot.steps.insert(step);
-        assert_eq!(bot.steps.len(), 1);
-        assert!(bot.steps.contains_step(step));
-    }
-
-    // #[tokio::test]
-    // async fn bot_should_have_next_step_in_store_as_expected() {
-    //     let step = RobotsTxt {};
-    //     let mut store = Context::new();
-    //     let _ = step.on_success(store);
-    //
-    //     assert_eq!(store.next_step, Some("RobotsTxt".to_string()));
-    // }
-
     #[tokio::test]
-    async fn bot_should_call_on_request_as_expected() {
+    async fn step_should_call_on_request_as_expected() {
         let step = RobotsTxt {};
         let req = step.on_request();
 

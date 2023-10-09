@@ -10,21 +10,21 @@ use crate::{HttpRequester, Request};
 /// This is passed to the step's `on_success` and `on_error` methods.
 pub struct Context {
     /// The original request struct.
-    pub request: Request,
+    request: Request,
     /// The next step to be executed.
-    pub current_step: Option<String>,
+    current_step: Option<String>,
     /// The HTTP requester which manages cookie store and client settings.
-    pub http_requester: HttpRequester,
+    http_requester: HttpRequester,
     /// The request builder from reqwest.
-    pub request_builder: Option<RequestBuilder>,
+    request_builder: Option<RequestBuilder>,
     /// The response from the request.
-    pub response_body: Option<bytes::Bytes>,
+    response_body: Option<bytes::Bytes>,
     /// The next step to be executed.
-    pub next_step: Option<String>,
+    next_step: Option<String>,
     /// If status codes are provided, then the response status code must be in the list.
-    pub status_codes: Option<Vec<u16>>,
+    status_codes: Option<Vec<u16>>,
     /// The time elapsed in milliseconds for the request.
-    pub time_elapsed: u64,
+    time_elapsed: u64,
 }
 
 impl Context {
@@ -89,8 +89,25 @@ impl Context {
         self.request_builder = Some(req_builder);
     }
 
+    /// Get the request builder.
+    pub fn get_request_builder(&mut self) -> Option<RequestBuilder> {
+        self.request_builder.take()
+    }
+
     pub fn get_url(&self) -> String {
         self.request.url().clone()
+    }
+
+    pub fn get_method(&self) -> String {
+        self.request.method().to_string().clone()
+    }
+
+    pub fn get_status_codes(&self) -> Option<Vec<u16>> {
+        self.status_codes.clone()
+    }
+
+    pub fn set_status_codes(&mut self, status_codes: Vec<u16>) {
+        self.status_codes = Some(status_codes);
     }
 
     /// Sets the response body in bytes.

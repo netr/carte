@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 
-use crate::bot::StepManager;
 use crate::context::Context;
+use crate::steps::StepManager;
 use crate::{StepError, Stepable};
 use std::io::Error;
 use std::sync::Arc;
 
 pub struct Worker {
     steps: StepManager,
-    ctx: Context,
+    pub ctx: Context,
 }
 
 impl Worker {
@@ -20,6 +20,10 @@ impl Worker {
 
     pub fn add_step(&mut self, step: impl Stepable + 'static) {
         self.steps.insert(step);
+    }
+
+    pub fn add_many_steps(&mut self, steps: Vec<Arc<dyn Stepable>>) {
+        self.steps.insert_many(steps);
     }
 
     pub fn add_step_arc(&mut self, step: Arc<dyn Stepable>) {
@@ -48,7 +52,7 @@ impl Worker {
         self.ctx.update_from_request(req)?;
         self.ctx.set_current_step(name.to_string());
 
-        let req_builder = self.ctx.request_builder.take().unwrap();
+        let req_builder = self.ctx.get_request_builder().unwrap();
 
         // Start processing the request and time it.
         let stop_watch = std::time::Instant::now();
@@ -70,7 +74,7 @@ impl Worker {
         if !self.check_status_code(res.status().as_u16()) {
             let error = StepError::StatusCodeNotFound(
                 res.status().as_u16() as i32,
-                self.ctx.status_codes.clone().unwrap_or_else(Vec::new),
+                self.ctx.get_status_codes().unwrap_or_else(Vec::new),
             );
 
             step.on_error(&mut self.ctx, error.clone());
@@ -86,6 +90,9 @@ impl Worker {
         };
 
         self.ctx.set_response_body(body);
+
+        // clear the next step since the context is being reused, this fixes the infinite loop bug
+        self.ctx.clear_next_step();
         step.on_success(&mut self.ctx);
 
         Ok(())
@@ -99,7 +106,7 @@ impl Worker {
     }
 
     fn check_status_code(&self, status_code: u16) -> bool {
-        match &self.ctx.status_codes {
+        match &self.ctx.get_status_codes() {
             Some(codes) => {
                 if codes.is_empty() {
                     return 300 > status_code && status_code >= 200;
@@ -197,8 +204,8 @@ mod tests {
 
         match worker.ctx.update_from_request(req) {
             Ok(_) => {
-                assert_eq!(worker.ctx.request.method(), "GET");
-                assert_eq!(worker.ctx.request.url(), "https://google.com");
+                assert_eq!(worker.ctx.get_method(), "GET");
+                assert_eq!(worker.ctx.get_url(), "https://google.com");
             }
             Err(e) => {
                 println!("Error: {}", e);
@@ -221,8 +228,8 @@ mod tests {
 
         match worker.try_step("RobotsTxt").await {
             Ok(_) => {
-                assert_eq!(worker.ctx.request.method(), "GET");
-                assert_eq!(worker.ctx.request.url(), "https://google.com");
+                assert_eq!(worker.ctx.get_method(), "GET");
+                assert_eq!(worker.ctx.get_url(), "https://google.com");
             }
             Err(e) => {
                 println!("Error: {}", e);
@@ -233,7 +240,7 @@ mod tests {
     #[test]
     fn check_status_codes_should_return_true_if_status_code_matches() {
         let mut worker = Worker::new();
-        worker.ctx.status_codes = Some(vec![200]);
+        worker.ctx.set_status_codes(vec![200]);
 
         assert!(worker.check_status_code(200));
     }
@@ -241,7 +248,7 @@ mod tests {
     #[test]
     fn check_status_codes_should_return_false_if_status_code_does_not_match() {
         let mut worker = Worker::new();
-        worker.ctx.status_codes = Some(vec![200]);
+        worker.ctx.set_status_codes(vec![200]);
 
         assert!(!worker.check_status_code(404));
     }
@@ -250,7 +257,7 @@ mod tests {
     fn check_status_codes_should_use_default_status_codes_if_200_to_300_if_status_cares_are_empty()
     {
         let mut worker = Worker::new();
-        worker.ctx.status_codes = Some(vec![]);
+        worker.ctx.set_status_codes(vec![]);
 
         assert!(worker.check_status_code(200));
     }
