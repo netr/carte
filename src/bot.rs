@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use reqwest::{RequestBuilder, Response};
 
-use crate::{hdr, HttpRequester, Request, StepError};
+use crate::{HttpRequester, Request, StepError};
 
 pub struct Bot {
     pub steps: StepManager,
@@ -188,7 +188,7 @@ mod tests {
     use reqwest::header::HeaderMap;
     use reqwest::Method;
 
-    use crate::Request;
+    use crate::{hdr, Request};
 
     use super::*;
 
