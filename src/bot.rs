@@ -123,6 +123,23 @@ pub struct Context {
 }
 
 impl Context {
+    pub fn new() -> Self {
+        let request = Request::default();
+        let http_requester = HttpRequester::new();
+        let request_builder = http_requester.build_reqwest(request.clone()).unwrap();
+
+        Context {
+            request,
+            current_step: None,
+            http_requester,
+            request_builder: Some(request_builder),
+            response: None,
+            next_step: None,
+            status_codes: None,
+            time_elapsed: 0,
+        }
+    }
+
     pub fn set_next_step(&mut self, step: String) {
         self.next_step = Some(step);
     }
