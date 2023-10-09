@@ -3,13 +3,13 @@ use std::time::Duration;
 use reqwest::header::HeaderMap;
 use reqwest::{Body, Method, Proxy};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Request {
     method: Method,
     url: String,
     headers: Option<HeaderMap>,
     timeout: Option<Duration>,
-    body: Option<CloneableBody>,
+    body: Option<MimicBody>,
     status_codes: Option<Vec<u16>>,
     proxy: Option<Proxy>,
     user_agent: Option<String>,
@@ -57,14 +57,14 @@ impl Request {
         self.timeout.clone()
     }
 
-    pub fn with_body(mut self, body: CloneableBody) -> Self {
+    pub fn with_body(mut self, body: MimicBody) -> Self {
         self.body = Some(body);
         self
     }
 
     pub fn body(self) -> Option<Body> {
         if let Some(b) = self.body {
-            Some(Body::from(b.data()))
+            Some(Body::from(b))
         } else {
             None
         }
@@ -132,38 +132,28 @@ impl Default for Request {
     }
 }
 
-#[derive(Debug)]
-pub struct CloneableBody {
-    data: Vec<u8>, // This assumes you can store the body as bytes
+#[derive(Debug, Clone)]
+pub enum MimicBody {
+    Bytes(Vec<u8>),
+    Text(String),
 }
 
-impl CloneableBody {
-    // Creates a new CloneableBody from a byte vector
-    pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
+impl MimicBody {
+    pub fn from_bytes(data: Vec<u8>) -> Self {
+        Self::Bytes(data)
     }
 
-    pub fn from_reqwest_body(body: Body) -> Self {
-        // Convert body to bytes
-        Self { data: vec![] }
-    }
-
-    pub fn data(&self) -> Vec<u8> {
-        self.data.clone()
+    pub fn from_text(data: String) -> Self {
+        Self::Text(data)
     }
 }
 
-impl Clone for CloneableBody {
-    fn clone(&self) -> Self {
-        Self {
-            data: self.data.clone(),
+impl From<MimicBody> for reqwest::Body {
+    fn from(body: MimicBody) -> reqwest::Body {
+        match body {
+            MimicBody::Bytes(bytes) => reqwest::Body::from(bytes),
+            MimicBody::Text(text) => reqwest::Body::from(text),
         }
-    }
-}
-
-impl From<CloneableBody> for reqwest::Body {
-    fn from(cloneable: CloneableBody) -> reqwest::Body {
-        reqwest::Body::from(cloneable.data)
     }
 }
 

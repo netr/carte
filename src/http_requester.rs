@@ -113,7 +113,7 @@ fn new_cookie_store() -> Arc<CookieStoreMutex> {
 
 #[cfg(test)]
 mod tests {
-    use crate::request::CloneableBody;
+    use crate::request::MimicBody;
     use reqwest::header::HeaderValue;
     use reqwest::Proxy;
 
@@ -203,7 +203,7 @@ mod tests {
 
         let req = Request::new(Method::POST, "https://google.com".to_string())
             .with_headers(headers)
-            .with_body(CloneableBody::new(vec![2, 3, 4]))
+            .with_body(MimicBody::from_bytes(vec![2, 3, 4]))
             .with_status_codes(vec![200])
             .build();
 
