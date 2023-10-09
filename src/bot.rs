@@ -29,6 +29,8 @@ impl Bot {
 
         let req = step.on_request();
         let mut ctx = Self::new_context(req);
+        ctx.current_step = Some(step_name.clone());
+
         let req_builder = ctx.request_builder.take().unwrap();
 
         let res = match req_builder.send().await {
@@ -74,6 +76,7 @@ impl Bot {
         let req_builder = http_req.build_reqwest(req).unwrap();
 
         Context {
+            current_step: None,
             http_requester: http_req,
             request_builder: Some(req_builder),
             response: None,
@@ -87,6 +90,8 @@ impl Bot {
 /// The context for the bots current step's execution.
 /// This is passed to the step's `on_success` and `on_error` methods.
 pub struct Context {
+    /// The next step to be executed.
+    pub current_step: Option<String>,
     /// The HTTP requester which manages cookie store and client settings.
     pub http_requester: HttpRequester,
     /// The request builder from reqwest.
@@ -104,6 +109,10 @@ pub struct Context {
 impl Context {
     pub fn set_next_step(&mut self, step: String) {
         self.next_step = Some(step);
+    }
+
+    pub fn clear_next_step(&mut self) {
+        self.next_step = None;
     }
 
     pub fn get_next_step(&self) -> Option<String> {
@@ -240,6 +249,7 @@ mod tests {
     async fn bot_should_have_next_step_in_store_as_expected() {
         let step = RobotsTxt {};
         let store = &mut Context {
+            current_step: None,
             http_requester: HttpRequester::new(),
             request_builder: None,
             response: None,
