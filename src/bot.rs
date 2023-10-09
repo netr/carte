@@ -207,14 +207,11 @@ mod tests {
                 Accept: */*"
             );
 
-            Request {
-                method: Method::GET,
-                url: "https://test.com".to_string(),
-                headers: Some(headers),
-                timeout: Some(Duration::new(30, 0)),
-                body: None,
-                status_codes: Some(vec![200]),
-            }
+            Request::new(Method::GET, "https://test.com".to_string())
+                .with_headers(headers)
+                .with_timeout(Duration::new(30, 0))
+                .with_status_codes(vec![200])
+                .build()
         }
 
         fn on_success(&self, ctx: &mut Context) {

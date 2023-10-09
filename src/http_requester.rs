@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::{Body, Client, IntoUrl, Method, RequestBuilder, Response};
 use reqwest::header::HeaderMap;
+use reqwest::{Body, Client, IntoUrl, Method, RequestBuilder, Response};
 use reqwest_cookie_store::{CookieStore, CookieStoreMutex};
 
 // http_requester.rs
@@ -45,16 +45,21 @@ impl HttpRequester {
     }
 
     /// Sends a request with all of the internal client settings.
-    pub async fn req<U, B, H>(&self, method: Method, url: U, body: B, headers: H) -> Result<Response, reqwest::Error>
-        where U: IntoUrl,
-              B: Into<Option<Body>>,
-              H: Into<Option<HeaderMap>>,
+    pub async fn req<U, B, H>(
+        &self,
+        method: Method,
+        url: U,
+        body: B,
+        headers: H,
+    ) -> Result<Response, reqwest::Error>
+    where
+        U: IntoUrl,
+        B: Into<Option<Body>>,
+        H: Into<Option<HeaderMap>>,
     {
         let client = &self.build_client()?;
 
-        let mut client = client
-            .request(method, url)
-            .timeout(Duration::new(30, 0));
+        let mut client = client.request(method, url).timeout(Duration::new(30, 0));
 
         if let Some(h) = headers.into() {
             client = client.headers(h);
@@ -69,8 +74,7 @@ impl HttpRequester {
     }
 
     /// Sends a request with all of the internal client settings.
-    pub fn build_reqwest(&self, req: Request) -> Result<RequestBuilder, reqwest::Error>
-    {
+    pub fn build_reqwest(&self, req: Request) -> Result<RequestBuilder, reqwest::Error> {
         let client = &self.build_client()?;
 
         let mut client = client
@@ -106,7 +110,6 @@ fn new_cookie_store() -> Arc<CookieStoreMutex> {
     let cookie_store = Arc::new(cookie_store);
     cookie_store
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -150,10 +153,7 @@ mod tests {
         let mut req = HttpRequester::new();
         req.settings.set_user_agent(Some(expected.clone()));
 
-        assert_eq!(
-            req.settings.user_agent().unwrap(),
-            &expected
-        )
+        assert_eq!(req.settings.user_agent().unwrap(), &expected)
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
                 assert!(format!("{:?}", client).contains("Http(https://secure.example)"));
                 assert!(format!("{:?}", client).contains("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"));
             }
-            Err(_) => panic!("invalid")
+            Err(_) => panic!("invalid"),
         }
     }
 
@@ -207,6 +207,9 @@ mod tests {
             timeout: Some(Duration::new(35, 0)),
             body: Some(Body::from("fuck yea".to_string())),
             status_codes: Some(vec![200]),
+            proxy: None,
+            user_agent: None,
+            gzip: true,
         };
 
         match http.build_reqwest(req) {
@@ -215,7 +218,7 @@ mod tests {
                 assert!(format!("{:?}", b).contains("google.com"));
                 assert!(format!("{:?}", b).contains("x-api-key"));
             }
-            Err(_) => panic!("invalid")
+            Err(_) => panic!("invalid"),
         }
     }
 
@@ -234,7 +237,7 @@ mod tests {
                 assert!(format!("{:?}", b).contains("method: POST"));
                 assert!(format!("{:?}", b).contains("test.com"));
             }
-            Err(_) => panic!("invalid")
+            Err(_) => panic!("invalid"),
         }
     }
 
@@ -248,7 +251,7 @@ mod tests {
                 assert!(format!("{:?}", b).contains("method: PATCH"));
                 assert!(format!("{:?}", b).contains("aol.com"));
             }
-            Err(_) => panic!("invalid")
+            Err(_) => panic!("invalid"),
         }
     }
 }

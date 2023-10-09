@@ -11,6 +11,9 @@ pub struct Request {
     pub timeout: Option<Duration>,
     pub body: Option<Body>,
     pub status_codes: Option<Vec<u16>>,
+    pub proxy: Option<String>,
+    pub user_agent: Option<String>,
+    pub gzip: bool,
 }
 
 impl Request {
@@ -22,7 +25,54 @@ impl Request {
             timeout: Some(Duration::new(30, 0)),
             body: None,
             status_codes: None,
+            proxy: None,
+            user_agent: None,
+            gzip: true,
         }
+    }
+
+    pub fn with_headers(mut self, headers: HeaderMap) -> Self {
+        self.headers = Some(headers);
+        self
+    }
+
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn with_body(mut self, body: Body) -> Self {
+        self.body = Some(body);
+        self
+    }
+
+    pub fn with_status_codes(mut self, status_codes: Vec<u16>) -> Self {
+        self.status_codes = Some(status_codes);
+        self
+    }
+
+    pub fn with_proxy(mut self, proxy: String) -> Self {
+        self.proxy = Some(proxy);
+        self
+    }
+
+    pub fn with_user_agent(mut self, user_agent: String) -> Self {
+        self.user_agent = Some(user_agent);
+        self
+    }
+
+    pub fn compressed(mut self) -> Self {
+        self.gzip = true;
+        self
+    }
+
+    pub fn no_compression(mut self) -> Self {
+        self.gzip = false;
+        self
+    }
+
+    pub fn build(self) -> Self {
+        self
     }
 }
 
@@ -35,6 +85,9 @@ impl Default for Request {
             timeout: Some(Duration::new(30, 0)),
             body: None,
             status_codes: None,
+            proxy: None,
+            user_agent: None,
+            gzip: true,
         }
     }
 }
@@ -103,5 +156,25 @@ mod tests {
     fn it_should_return_no_headers_if_invalid_text() {
         let headers = hdr!("this is not a real header and should not work");
         assert_eq!(headers.len(), 0);
+    }
+
+    #[test]
+    fn it_should_use_the_request_builder_pattern_to_create_a_basic_request() {
+        let req = Request::new(Method::GET, "https://google.com".to_string())
+            .with_headers(hdr!("Accept-Encoding: gzip, deflate, br"))
+            .with_timeout(Duration::new(710, 0))
+            .with_status_codes(vec![200, 210, 222])
+            .with_proxy("https://secure.example".to_string())
+            .with_user_agent("reqwest".to_string())
+            .no_compression()
+            .build();
+        assert_eq!(req.method, Method::GET);
+        assert_eq!(req.url, "https://google.com");
+        assert_eq!(req.headers.unwrap().len(), 1);
+        assert_eq!(req.timeout.unwrap().as_secs(), 710);
+        assert_eq!(req.status_codes.unwrap().len(), 3);
+        assert_eq!(req.proxy.unwrap(), "https://secure.example");
+        assert_eq!(req.user_agent.unwrap(), "reqwest");
+        assert_eq!(req.gzip, false);
     }
 }
