@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use reqwest::header::HeaderMap;
-use reqwest::{Body, Method};
+use reqwest::{Body, Method, Proxy};
 
 #[derive(Debug)]
 pub struct Request {
@@ -9,9 +9,9 @@ pub struct Request {
     url: String,
     headers: Option<HeaderMap>,
     timeout: Option<Duration>,
-    body: Option<Body>,
+    body: Option<CloneableBody>,
     status_codes: Option<Vec<u16>>,
-    proxy: Option<String>,
+    proxy: Option<Proxy>,
     user_agent: Option<String>,
     gzip: bool,
 }
@@ -57,13 +57,17 @@ impl Request {
         self.timeout.clone()
     }
 
-    pub fn with_body(mut self, body: Body) -> Self {
+    pub fn with_body(mut self, body: CloneableBody) -> Self {
         self.body = Some(body);
         self
     }
 
     pub fn body(self) -> Option<Body> {
-        self.body
+        if let Some(b) = self.body {
+            Some(Body::from(b.data()))
+        } else {
+            None
+        }
     }
 
     pub fn with_status_codes(mut self, status_codes: Vec<u16>) -> Self {
@@ -75,13 +79,13 @@ impl Request {
         self.status_codes.clone()
     }
 
-    pub fn with_proxy(mut self, proxy: String) -> Self {
+    pub fn with_proxy(mut self, proxy: Proxy) -> Self {
         self.proxy = Some(proxy);
         self
     }
 
-    pub fn proxy(&self) -> Option<&String> {
-        self.proxy.as_ref()
+    pub fn proxy(&self) -> Option<Proxy> {
+        self.proxy.clone()
     }
 
     pub fn with_user_agent(mut self, user_agent: String) -> Self {
@@ -89,8 +93,8 @@ impl Request {
         self
     }
 
-    pub fn user_agent(&self) -> Option<&String> {
-        self.user_agent.as_ref()
+    pub fn user_agent(&self) -> Option<String> {
+        self.user_agent.clone()
     }
 
     pub fn compressed(mut self) -> Self {
@@ -125,6 +129,41 @@ impl Default for Request {
             user_agent: None,
             gzip: true,
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct CloneableBody {
+    data: Vec<u8>, // This assumes you can store the body as bytes
+}
+
+impl CloneableBody {
+    // Creates a new CloneableBody from a byte vector
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { data }
+    }
+
+    pub fn from_reqwest_body(body: Body) -> Self {
+        // Convert body to bytes
+        Self { data: vec![] }
+    }
+
+    pub fn data(&self) -> Vec<u8> {
+        self.data.clone()
+    }
+}
+
+impl Clone for CloneableBody {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
+    }
+}
+
+impl From<CloneableBody> for reqwest::Body {
+    fn from(cloneable: CloneableBody) -> reqwest::Body {
+        reqwest::Body::from(cloneable.data)
     }
 }
 
@@ -200,7 +239,7 @@ mod tests {
             .with_headers(hdr!("Accept-Encoding: gzip, deflate, br"))
             .with_timeout(Duration::new(710, 0))
             .with_status_codes(vec![200, 210, 222])
-            .with_proxy("https://secure.example".to_string())
+            .with_proxy(Proxy::http("https://secure.example").unwrap())
             .with_user_agent("reqwest".to_string())
             .no_compression()
             .build();
@@ -209,7 +248,10 @@ mod tests {
         assert_eq!(req.headers().unwrap().len(), 1);
         assert_eq!(req.timeout().unwrap().as_secs(), 710);
         assert_eq!(req.status_codes().unwrap().len(), 3);
-        assert_eq!(req.proxy().unwrap(), "https://secure.example");
+        assert_eq!(
+            format!("{:?}", req.proxy().unwrap()),
+            "Proxy(Http(https://secure.example), None)"
+        );
         assert_eq!(req.user_agent().unwrap(), "reqwest");
         assert_eq!(req.is_compressed(), false);
     }

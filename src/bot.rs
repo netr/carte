@@ -71,8 +71,14 @@ impl Bot {
     }
 
     fn new_context(req: Request) -> Context {
-        let http_req: HttpRequester = HttpRequester::new();
+        let mut http_req: HttpRequester = HttpRequester::new();
+
+        // set the proxy, user agent, and compression settings before we give up ownership of the request.
         let status_codes = req.status_codes().clone();
+        http_req.settings.set_proxy(req.proxy());
+        http_req.settings.set_user_agent(req.user_agent());
+        http_req.settings.set_compression(req.is_compressed());
+
         let req_builder = http_req.build_reqwest(req).unwrap();
 
         Context {
