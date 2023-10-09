@@ -20,10 +20,12 @@ Work in progress, subject to change. Not ready for production use.
 - [x] Basic functionality for a simple recursive bot with multiple steps
 - [x] Create a macro for `hdr!`(r#"Content-type: application/json#Accept: application/json") to make it easier to create
   headers
-- [ ] Create a macro for `body!`(r#"{"key": "value"}"#) to make it easier to create bodies
 - [x] Setup a `Request` builder pattern to make it less verbose to create requests
+- [ ] Move `Context` to a `ContextBuilder` pattern to make it less verbose to create contexts?
+- [ ] Move `Context` to its own module and remove `pub` from `Context` struct
 - [ ] Create a more robust `example using an api` that requires authentication, session management, etc.
 - [ ] Allow for `shared state` such as databases or other resources
+- [ ] Allow for file uploads
 - [ ] More robust custom response and requests in the `context`
 - [ ] Allow for skipping steps during `on_request()`
 - [ ] More robust timeout and pause functionality [Timeout, AfterSuccess, AfterError, etc]
@@ -94,14 +96,11 @@ impl Stepable for Google {
             Accept: */*"#
         );
 
-        Request {
-            method: Method::GET,
-            url: "https://google.com".to_string(),
-            headers: Some(headers),
-            timeout: Some(Duration::new(30, 0)),
-            body: None,
-            status_codes: Some(vec![200]),
-        }
+        Request::new(Method::GET, "https://google.com".to_string())
+            .with_headers(headers)
+            .with_timeout(Duration::new(60, 0))
+            .with_status_codes(vec![200])
+            .build();
     }
 
     fn on_success(&self, ctx: &mut Context) {
@@ -115,11 +114,11 @@ impl Stepable for Google {
         ctx.set_next_step(Steps::Facebook.to_string());
     }
 
-    fn on_error(&self, err: StepError) {
+    fn on_error(&self, ctx: &mut Context, err: StepError) {
         todo!()
     }
 
-    fn on_timeout(&self) {
+    fn on_timeout(&self, ctx: &mut Context) {
         todo!()
     }
 }
@@ -135,7 +134,6 @@ impl Stepable for Facebook {
     }
 
     fn on_request(&mut self) -> Request {
-        // use the request builder pattern
         Request::new(Method::GET, "https://facebook.com".to_string())
             .with_headers(hdr!("Accept-Encoding: gzip, deflate, br"))
             .with_timeout(Duration::new(60, 0))
@@ -153,11 +151,11 @@ impl Stepable for Facebook {
         // without setting a next_step, the bot will stop
     }
 
-    fn on_error(&self, err: StepError) {
+    fn on_error(&self, ctx: &mut Context, err: StepError) {
         todo!()
     }
 
-    fn on_timeout(&self) {
+    fn on_timeout(&self, ctx: &mut Context) {
         todo!()
     }
 }

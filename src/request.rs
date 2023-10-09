@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use reqwest::header::HeaderMap;
+use reqwest::multipart::{Form, Part};
 use reqwest::{Body, Method, Proxy};
 
 #[derive(Debug, Clone)]
@@ -10,6 +11,7 @@ pub struct Request {
     headers: Option<HeaderMap>,
     timeout: Option<Duration>,
     body: Option<MimicBody>,
+    multipart: Option<MimicForm>,
     status_codes: Option<Vec<u16>>,
     proxy: Option<Proxy>,
     user_agent: Option<String>,
@@ -24,6 +26,7 @@ impl Request {
             headers: None,
             timeout: Some(Duration::new(30, 0)),
             body: None,
+            multipart: None,
             status_codes: None,
             proxy: None,
             user_agent: None,
@@ -62,9 +65,22 @@ impl Request {
         self
     }
 
-    pub fn body(self) -> Option<Body> {
-        if let Some(b) = self.body {
-            Some(Body::from(b))
+    pub fn body(&self) -> Option<Body> {
+        if let Some(b) = &self.body {
+            Some(Body::from(b.clone()))
+        } else {
+            None
+        }
+    }
+
+    pub fn with_multipart(mut self, multipart: MimicForm) -> Self {
+        self.multipart = Some(multipart);
+        self
+    }
+
+    pub fn multipart(&self) -> Option<Form> {
+        if let Some(m) = &self.multipart {
+            Some(Form::from(m.clone()))
         } else {
             None
         }
@@ -124,6 +140,7 @@ impl Default for Request {
             headers: None,
             timeout: Some(Duration::new(30, 0)),
             body: None,
+            multipart: None,
             status_codes: None,
             proxy: None,
             user_agent: None,
@@ -154,6 +171,35 @@ impl From<MimicBody> for reqwest::Body {
             MimicBody::Bytes(bytes) => reqwest::Body::from(bytes),
             MimicBody::Text(text) => reqwest::Body::from(text),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MimicForm {
+    texts: Vec<(String, String)>,
+    bytes: Vec<(String, Vec<u8>)>,
+}
+
+impl MimicForm {
+    pub fn new(texts: Vec<(String, String)>, bytes: Vec<(String, Vec<u8>)>) -> Self {
+        Self { texts, bytes }
+    }
+}
+
+impl From<MimicForm> for reqwest::multipart::Form {
+    fn from(body: MimicForm) -> reqwest::multipart::Form {
+        let form = Form::new();
+        // add all body.texts to form.text without losing ownership of form afterwards
+        let form = body
+            .texts
+            .into_iter()
+            .fold(form, |form, (key, value)| form.text(key, value));
+
+        let form = body.bytes.into_iter().fold(form, |form, (key, value)| {
+            form.part(key, Part::bytes(value))
+        });
+
+        form
     }
 }
 
@@ -224,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn it_should_use_the_request_builder_pattern_to_create_a_basic_request() {
+    fn it_should_use_the_request_builder_pattern_as_expected() {
         let req = Request::new(Method::GET, "https://google.com".to_string())
             .with_headers(hdr!("Accept-Encoding: gzip, deflate, br"))
             .with_timeout(Duration::new(710, 0))
