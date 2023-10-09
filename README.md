@@ -1,6 +1,6 @@
-# Carte
+# mimicr
 
-![carte github actions workflow](https://github.com/netr/carte/actions/workflows/carte.yml/badge.svg)
+![mimicr github actions workflow](https://github.com/netr/mimicr/actions/workflows/mimicr.yml/badge.svg)
 
 Using this project as a learning experience for Rust.
 
@@ -18,7 +18,7 @@ Work in progress, subject to change. Not ready for production use.
 ## Usage
 
 ```rust
-use carte::{Bot, Context, Request, StepError, Stepable};
+use mimicr::{Bot, Context, Request, StepError, Stepable};
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
