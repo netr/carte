@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use reqwest::{RequestBuilder, Response};
@@ -164,15 +165,16 @@ impl Context {
 #[async_trait]
 pub trait Stepable {
     fn name(&self) -> String;
-    fn on_request(&mut self) -> Request;
+    fn on_request(&self) -> Request;
     fn on_success(&self, ctx: &mut Context);
     fn on_error(&self, ctx: &mut Context, err: StepError);
     fn on_timeout(&self, ctx: &mut Context);
     // async fn execute(&self, res: StepperResponse) -> Result<StepperResponse, Error>;
 }
 
+#[derive(Clone)]
 pub struct StepManager {
-    handlers: HashMap<String, Box<dyn Stepable>>,
+    handlers: HashMap<String, Arc<dyn Stepable>>,
 }
 
 impl StepManager {
@@ -183,21 +185,21 @@ impl StepManager {
 
     pub fn insert(&mut self, step: impl Stepable + 'static) {
         self.handlers
-            .insert(step.name().parse().unwrap(), Box::new(step));
+            .insert(step.name().parse().unwrap(), Arc::new(step));
     }
 
-    pub fn insert_box(&mut self, step: Box<dyn Stepable>) {
+    pub fn insert_arc(&mut self, step: Arc<dyn Stepable>) {
         self.handlers.insert(step.name().parse().unwrap(), step);
     }
 
-    pub fn insert_many(&mut self, steps: Vec<Box<dyn Stepable>>) {
+    pub fn insert_many(&mut self, steps: Vec<Arc<dyn Stepable>>) {
         for step in steps {
             self.handlers.insert(step.name().parse().unwrap(), step);
         }
     }
 
-    pub fn get(&mut self, step: &str) -> Option<&mut Box<dyn Stepable>> {
-        let step = self.handlers.get_mut(step).unwrap();
+    pub fn get(&self, step: &str) -> Option<&Arc<dyn Stepable>> {
+        let step = self.handlers.get(step).unwrap();
         Some(step)
     }
 
@@ -234,7 +236,7 @@ mod tests {
             "RobotsTxt".parse().unwrap()
         }
 
-        fn on_request(&mut self) -> Request {
+        fn on_request(&self) -> Request {
             let headers = hdr!(
                 "User-Agent: reqwest
                 Accept: */*"
@@ -296,7 +298,7 @@ mod tests {
 
     #[tokio::test]
     async fn bot_should_call_on_request_as_expected() {
-        let mut step = RobotsTxt {};
+        let step = RobotsTxt {};
         let req = step.on_request();
 
         assert_eq!(req.method(), Method::GET);
