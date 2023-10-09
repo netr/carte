@@ -16,6 +16,7 @@ pub struct Request {
     proxy: Option<Proxy>,
     user_agent: Option<String>,
     gzip: bool,
+    skip: bool,
 }
 
 impl Request {
@@ -31,6 +32,7 @@ impl Request {
             proxy: None,
             user_agent: None,
             gzip: true,
+            skip: false,
         }
     }
 
@@ -127,6 +129,15 @@ impl Request {
         self
     }
 
+    pub fn skip(mut self) -> Self {
+        self.skip = true;
+        self
+    }
+
+    pub fn is_skipped(&self) -> bool {
+        self.skip
+    }
+
     pub fn build(self) -> Self {
         self
     }
@@ -145,6 +156,7 @@ impl Default for Request {
             proxy: None,
             user_agent: None,
             gzip: true,
+            skip: false,
         }
     }
 }
