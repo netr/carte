@@ -94,14 +94,11 @@ impl Stepable for Google {
             Accept: */*"#
         );
 
-        Request {
-            method: Method::GET,
-            url: "https://google.com".to_string(),
-            headers: Some(headers),
-            timeout: Some(Duration::new(30, 0)),
-            body: None,
-            status_codes: Some(vec![200]),
-        }
+        Request::new(Method::GET, "https://google.com".to_string())
+            .with_headers(headers)
+            .with_timeout(Duration::new(60, 0))
+            .with_status_codes(vec![200])
+            .build();
     }
 
     fn on_success(&self, ctx: &mut Context) {
@@ -115,11 +112,11 @@ impl Stepable for Google {
         ctx.set_next_step(Steps::Facebook.to_string());
     }
 
-    fn on_error(&self, err: StepError) {
+    fn on_error(&self, ctx: &mut Context, err: StepError) {
         todo!()
     }
 
-    fn on_timeout(&self) {
+    fn on_timeout(&self, ctx: &mut Context) {
         todo!()
     }
 }
@@ -135,7 +132,6 @@ impl Stepable for Facebook {
     }
 
     fn on_request(&mut self) -> Request {
-        // use the request builder pattern
         Request::new(Method::GET, "https://facebook.com".to_string())
             .with_headers(hdr!("Accept-Encoding: gzip, deflate, br"))
             .with_timeout(Duration::new(60, 0))
@@ -153,11 +149,11 @@ impl Stepable for Facebook {
         // without setting a next_step, the bot will stop
     }
 
-    fn on_error(&self, err: StepError) {
+    fn on_error(&self, ctx: &mut Context, err: StepError) {
         todo!()
     }
 
-    fn on_timeout(&self) {
+    fn on_timeout(&self, ctx: &mut Context) {
         todo!()
     }
 }

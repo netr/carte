@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn it_should_use_the_request_builder_pattern_to_create_a_basic_request() {
+    fn it_should_use_the_request_builder_pattern_as_expected() {
         let req = Request::new(Method::GET, "https://google.com".to_string())
             .with_headers(hdr!("Accept-Encoding: gzip, deflate, br"))
             .with_timeout(Duration::new(710, 0))
