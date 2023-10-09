@@ -34,6 +34,11 @@ impl ClientSettings {
         self.user_agent.as_ref()
     }
 
+    pub fn set_compression(&mut self, gzip: bool) -> &mut Self {
+        self.gzip = gzip;
+        self
+    }
+
     pub fn enable_compression(&mut self) -> &mut Self {
         self.gzip = true;
         self

@@ -21,7 +21,7 @@ Work in progress, subject to change. Not ready for production use.
 - [x] Create a macro for `hdr!`(r#"Content-type: application/json#Accept: application/json") to make it easier to create
   headers
 - [ ] Create a macro for `body!`(r#"{"key": "value"}"#) to make it easier to create bodies
-- [ ] Setup a `Request` builder pattern to make it less verbose to create requests
+- [x] Setup a `Request` builder pattern to make it less verbose to create requests
 - [ ] Create a more robust `example using an api` that requires authentication, session management, etc.
 - [ ] Allow for `shared state` such as databases or other resources
 - [ ] More robust custom response and requests in the `context`
@@ -135,14 +135,12 @@ impl Stepable for Facebook {
     }
 
     fn on_request(&mut self) -> Request {
-        Request {
-            method: Method::GET,
-            url: "https://facebook.com".to_string(),
-            headers: None,
-            timeout: Some(Duration::new(30, 0)),
-            body: None,
-            status_codes: Some(vec![200]),
-        }
+        // use the request builder pattern
+        Request::new(Method::GET, "https://facebook.com".to_string())
+            .with_headers(hdr!("Accept-Encoding: gzip, deflate, br"))
+            .with_timeout(Duration::new(60, 0))
+            .with_status_codes(vec![200])
+            .build();
     }
 
     fn on_success(&self, ctx: &mut Context) {
