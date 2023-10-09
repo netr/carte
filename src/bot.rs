@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use reqwest::{RequestBuilder, Response};
+use encoding_rs::{Encoding, UTF_8};
+use reqwest::RequestBuilder;
+use serde::de::DeserializeOwned;
 
 use crate::{HttpRequester, Request, StepError};
 
@@ -72,7 +74,7 @@ impl Bot {
         }
 
         // Everything is good, so call the step's `on_success` method.
-        ctx.response = Some(res);
+        ctx.response = None;
         step.on_success(&mut ctx); // Using the reference
 
         Ok(ctx)
@@ -114,7 +116,7 @@ pub struct Context {
     /// The request builder from reqwest.
     pub request_builder: Option<RequestBuilder>,
     /// The response from the request.
-    pub response: Option<Response>,
+    pub response: Option<bytes::Bytes>,
     /// The next step to be executed.
     pub next_step: Option<String>,
     /// If status codes are provided, then the response status code must be in the list.
@@ -159,6 +161,41 @@ impl Context {
 
     pub fn set_time_elapsed(&mut self, time_elapsed: u64) {
         self.time_elapsed = time_elapsed;
+    }
+
+    pub fn set_response(&mut self, res: bytes::Bytes) {
+        self.response = Some(res);
+    }
+
+    pub fn set_request_builder(&mut self, req_builder: RequestBuilder) {
+        self.request_builder = Some(req_builder);
+    }
+
+    pub fn body_bytes(&self) -> Option<bytes::Bytes> {
+        self.response.clone()
+    }
+
+    pub fn body_text(&self) -> String {
+        if self.response.is_none() {
+            return String::new();
+        }
+
+        let encoding = Encoding::for_label(b"utf-8").unwrap_or(UTF_8);
+        let (text, _, _) = encoding.decode(&self.response.as_ref().unwrap());
+
+        text.to_string()
+    }
+
+    pub async fn body_json<T: DeserializeOwned>(&self) -> Result<T, Box<dyn std::error::Error>> {
+        if self.response.is_none() {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "No response",
+            )));
+        }
+
+        serde_json::from_slice(&self.response.as_ref().unwrap())
+            .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })
     }
 }
 

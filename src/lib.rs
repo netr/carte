@@ -5,8 +5,8 @@ pub use http_requester::HttpRequester;
 pub use request::Request;
 
 mod bot;
-mod bot2;
 mod client_settings;
 mod errors;
 mod http_requester;
 mod request;
+mod worker;
