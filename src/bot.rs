@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use reqwest::{RequestBuilder, Response};
 
-use crate::{HttpRequester, Request, StepError};
+use crate::{hdr, HttpRequester, Request, StepError};
 
 pub struct Bot {
     pub steps: StepManager,
@@ -185,7 +185,7 @@ impl StepManager {
 mod tests {
     use std::time::Duration;
 
-    use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+    use reqwest::header::HeaderMap;
     use reqwest::Method;
 
     use crate::Request;
@@ -202,8 +202,10 @@ mod tests {
         }
 
         fn on_request(&mut self) -> Request {
-            let mut headers = HeaderMap::new();
-            headers.insert(USER_AGENT, HeaderValue::from_static("reqwest"));
+            let headers = hdr!(
+                "User-Agent: reqwest
+                Accept: */*"
+            );
 
             Request {
                 method: Method::GET,

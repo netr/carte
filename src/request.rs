@@ -40,6 +40,7 @@ impl Default for Request {
 }
 
 #[allow(unused_macros)]
+#[macro_export]
 macro_rules! hdr {
     ($text:expr) => {{
         let mut headers = HeaderMap::new();
@@ -67,11 +68,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_should_properly_use_hdr_macro_to_parse_large_amount_of_headers() {
+    fn it_should_work_properly_with_a_blob_of_text_based_headers() {
         let text = r#"Accept-Encoding: gzip, deflate, br
-Referer:https://github.com/rust-lang/rust
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36
-X-Requested-With: XMLHttpRequest"#;
+                            Referer:https://github.com/rust-lang/rust
+                            User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36
+                            X-Requested-With: XMLHttpRequest"#;
 
         let headers = hdr!(text);
         assert_eq!(headers.len(), 4);
