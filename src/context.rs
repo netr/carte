@@ -27,6 +27,12 @@ pub struct Context {
     time_elapsed: u64,
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Context::new()
+    }
+}
+
 impl Context {
     pub fn new() -> Self {
         let request = Request::default();
@@ -132,7 +138,7 @@ impl Context {
         }
 
         let encoding = Encoding::for_label(b"utf-8").unwrap_or(UTF_8);
-        let (text, _, _) = encoding.decode(&self.response_body.as_ref().unwrap());
+        let (text, _, _) = encoding.decode(self.response_body.as_ref().unwrap());
 
         Ok(text.to_string())
     }
@@ -143,20 +149,20 @@ impl Context {
             return Err(Self::no_body_error());
         }
 
-        serde_json::from_slice(&self.response_body.as_ref().unwrap())
+        serde_json::from_slice(self.response_body.as_ref().unwrap())
             .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })
     }
 
     fn no_body_error() -> Box<dyn Error> {
-        return Box::new(std::io::Error::new(
+        Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             "No body has been set from the request.",
-        ));
+        ))
     }
 
     /// Updates the context from the request.
     /// This is useful for updating the success status codes, proxy, user agent, and compression settings.
-    pub fn update_from_request(&mut self, req: Request) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn update_from_request(&mut self, req: Request) -> Result<(), Box<dyn Error>> {
         self.http_requester.settings.set_proxy(req.proxy());
         self.http_requester
             .settings
@@ -231,6 +237,6 @@ mod tests {
         ctx.set_response_body(res);
 
         let err = ctx.body_json::<serde_json::Value>().await.unwrap_err();
-        assert!(err.to_string().len() > 0);
+        assert!(!err.to_string().is_empty());
     }
 }

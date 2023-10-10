@@ -21,6 +21,12 @@ pub struct StepManager {
     handlers: HashMap<String, Arc<dyn Stepable>>,
 }
 
+impl Default for StepManager {
+    fn default() -> Self {
+        StepManager::new()
+    }
+}
+
 #[allow(dead_code)]
 impl StepManager {
     pub fn new() -> Self {

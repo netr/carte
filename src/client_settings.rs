@@ -7,6 +7,12 @@ pub struct ClientSettings {
     gzip: bool,
 }
 
+impl Default for ClientSettings {
+    fn default() -> Self {
+        ClientSettings::new()
+    }
+}
+
 impl ClientSettings {
     pub fn new() -> Self {
         Self {
