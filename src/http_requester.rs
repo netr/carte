@@ -15,6 +15,12 @@ pub struct HttpRequester {
     pub settings: Box<ClientSettings>,
 }
 
+impl Default for HttpRequester {
+    fn default() -> Self {
+        HttpRequester::new()
+    }
+}
+
 impl HttpRequester {
     pub fn new() -> Self {
         let cookie_store = new_cookie_store();
@@ -81,12 +87,12 @@ impl HttpRequester {
             .request(req.method(), req.url())
             .timeout(Duration::new(30, 0));
 
-        match req.timeout().into() {
+        match req.timeout() {
             Some(to) => client = client.timeout(to),
             None => client = client.timeout(Duration::new(30, 0)),
         }
 
-        if let Some(h) = req.headers().into() {
+        if let Some(h) = req.headers() {
             client = client.headers(h);
         }
         if let Some(b) = req.body() {
@@ -110,8 +116,7 @@ impl HttpRequester {
 
 fn new_cookie_store() -> Arc<CookieStoreMutex> {
     let cookie_store = CookieStoreMutex::new(CookieStore::new(None));
-    let cookie_store = Arc::new(cookie_store);
-    cookie_store
+    Arc::new(cookie_store)
 }
 
 #[cfg(test)]

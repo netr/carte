@@ -62,7 +62,7 @@ impl Request {
     }
 
     pub fn timeout(&self) -> Option<Duration> {
-        self.timeout.clone()
+        self.timeout
     }
 
     pub fn with_body(mut self, body: MimicBody) -> Self {
@@ -71,11 +71,7 @@ impl Request {
     }
 
     pub fn body(&self) -> Option<Body> {
-        if let Some(b) = &self.body {
-            Some(Body::from(b.clone()))
-        } else {
-            None
-        }
+        self.body.as_ref().map(|b| Body::from(b.clone()))
     }
 
     pub fn with_multipart(mut self, multipart: MimicForm) -> Self {
@@ -84,11 +80,7 @@ impl Request {
     }
 
     pub fn multipart(&self) -> Option<Form> {
-        if let Some(m) = &self.multipart {
-            Some(Form::from(m.clone()))
-        } else {
-            None
-        }
+        self.multipart.as_ref().map(|m| Form::from(m.clone()))
     }
 
     pub fn with_status_codes(mut self, status_codes: Vec<u16>) -> Self {
@@ -184,8 +176,8 @@ impl MimicBody {
     }
 }
 
-impl From<MimicBody> for reqwest::Body {
-    fn from(body: MimicBody) -> reqwest::Body {
+impl From<MimicBody> for Body {
+    fn from(body: MimicBody) -> Body {
         match body {
             MimicBody::Bytes(bytes) => reqwest::Body::from(bytes),
             MimicBody::Text(text) => reqwest::Body::from(text),
@@ -205,8 +197,8 @@ impl MimicForm {
     }
 }
 
-impl From<MimicForm> for reqwest::multipart::Form {
-    fn from(body: MimicForm) -> reqwest::multipart::Form {
+impl From<MimicForm> for Form {
+    fn from(body: MimicForm) -> Form {
         let form = Form::new();
         // add all body.texts to form.text without losing ownership of form afterwards
         let form = body
@@ -214,11 +206,9 @@ impl From<MimicForm> for reqwest::multipart::Form {
             .into_iter()
             .fold(form, |form, (key, value)| form.text(key, value));
 
-        let form = body.bytes.into_iter().fold(form, |form, (key, value)| {
+        body.bytes.into_iter().fold(form, |form, (key, value)| {
             form.part(key, Part::bytes(value))
-        });
-
-        form
+        })
     }
 }
 
@@ -316,6 +306,6 @@ mod tests {
             "Proxy(Http(https://secure.example), None)"
         );
         assert_eq!(req.user_agent().unwrap(), "reqwest");
-        assert_eq!(req.is_compressed(), false);
+        assert!(!req.is_compressed());
     }
 }

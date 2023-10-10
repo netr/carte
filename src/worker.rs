@@ -11,6 +11,12 @@ pub struct Worker {
     pub ctx: Context,
 }
 
+impl Default for Worker {
+    fn default() -> Self {
+        Worker::new()
+    }
+}
+
 impl Worker {
     pub fn new() -> Self {
         let steps = StepManager::new();
@@ -80,7 +86,7 @@ impl Worker {
         if !self.check_status_code(res.status().as_u16()) {
             let error = StepError::StatusCodeNotFound(
                 res.status().as_u16() as i32,
-                self.ctx.get_status_codes().unwrap_or_else(Vec::new),
+                self.ctx.get_status_codes().unwrap_or_default(),
             );
 
             step.on_error(&mut self.ctx, error.clone());
@@ -115,11 +121,11 @@ impl Worker {
         match &self.ctx.get_status_codes() {
             Some(codes) => {
                 if codes.is_empty() {
-                    return 300 > status_code && status_code >= 200;
+                    return (200..300).contains(&status_code);
                 }
                 codes.contains(&status_code)
             }
-            None => 300 > status_code && status_code >= 200,
+            None => (200..300).contains(&status_code),
         }
     }
 }
@@ -245,7 +251,7 @@ mod tests {
             }
             Err(e) => {
                 println!("Error: {}", e);
-                assert!(false);
+                unreachable!()
             }
         }
     }
